@@ -15,7 +15,7 @@
 !README.md
 !LICENSE
 build/
-soc/
+!soc/**
 
 # mill
 out/
