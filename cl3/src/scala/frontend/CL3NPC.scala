@@ -15,7 +15,7 @@ trait NPCConfig {
 class CL3NPC() extends Module with NPCConfig with CL3Config {
   val io = IO(new NPCFullIO())
 
-  val pc_plus_8 = (io.pc(31, 3) ## 0.U(3.W)) + 8.U
+  val pc_plus_8 = (io.info.pc(31, 3) ## 0.U(3.W)) + 8.U
 
   if (EnableBP) {
 
@@ -32,11 +32,11 @@ class CL3NPC() extends Module with NPCConfig with CL3Config {
 
     val btb = RegInit(VecInit(Seq.fill(numBtbEntries)(0.U.asTypeOf(new BtbEntry))))
 
-    val btb_hit_lo_vec = VecInit(btb.map(_.pc === io.pc))
+    val btb_hit_lo_vec = VecInit(btb.map(_.pc === io.info.pc))
     val btb_hit_lo     = btb_hit_lo_vec.asUInt.orR
 
-    val check_hi       = !btb_hit_lo && !io.pc(2)
-    val btb_hit_hi_vec = VecInit(btb.map(_.pc === (io.pc | 4.U)))
+    val check_hi       = !btb_hit_lo && !io.info.pc(2)
+    val btb_hit_hi_vec = VecInit(btb.map(_.pc === (io.info.pc | 4.U)))
     val btb_hit_hi     = btb_hit_hi_vec.asUInt.orR && check_hi
 
     val btb_hit = btb_hit_hi || btb_hit_lo
@@ -48,9 +48,9 @@ class CL3NPC() extends Module with NPCConfig with CL3Config {
     // --- BTB Update Logic (on branch resolution) ---
 
     // TODO: the update logic should change when BTB is SRAM
-    val btb_hit_br_vec = VecInit(btb.map(_.pc === io.br.source))
+    val btb_hit_br_vec = VecInit(btb.map(_.pc === io.bp.source))
     val btb_hit_br     = btb_hit_br_vec.asUInt.orR
-    val btb_br_miss    = io.br.valid && !btb_hit_br
+    val btb_br_miss    = io.bp.valid && !btb_hit_br
     val btb_br_idx     = OHToUInt(btb_hit_br_vec)
 
     val lfsr = Module(new LFSR(numBtbEntriesWidth))
@@ -60,16 +60,16 @@ class CL3NPC() extends Module with NPCConfig with CL3Config {
     val btb_wr_idx = Mux(btb_hit_br, btb_br_idx, btb_alloc_idx)
 
     // TODO: we don't need to change BTB in some cases
-    when(io.br.valid) {
+    when(io.bp.valid) {
 
-      btb(btb_wr_idx).pc     := io.br.source
-      btb(btb_wr_idx).isCall := io.br.isCall
-      btb(btb_wr_idx).isRet  := io.br.isRet
-      btb(btb_wr_idx).isJmp  := io.br.isJmp
+      btb(btb_wr_idx).pc     := io.bp.source
+      btb(btb_wr_idx).isCall := io.bp.isCall
+      btb(btb_wr_idx).isRet  := io.bp.isRet
+      btb(btb_wr_idx).isJmp  := io.bp.isJmp
 
       // Update target only if it was a taken branch or a new entry
-      when(io.br.isTaken || !btb_hit_br) {
-        btb(btb_wr_idx).target := io.br.target
+      when(io.bp.isTaken || !btb_hit_br) {
+        btb(btb_wr_idx).target := io.bp.target
       }
     }
 
@@ -82,9 +82,9 @@ class CL3NPC() extends Module with NPCConfig with CL3Config {
 
     // RAS Index (actually), update when branch is resolved
     val ras_idx_real_q = RegInit(0.U(numRasEntriesWidth.W))
-    when(io.br.valid && io.br.isCall) {
+    when(io.bp.valid && io.bp.isCall) {
       ras_idx_real_q := ras_idx_real_q + 1.U
-    }.elsewhen(io.br.valid && io.br.isRet) {
+    }.elsewhen(io.bp.valid && io.bp.isRet) {
       ras_idx_real_q := ras_idx_real_q - 1.U
     }
 
@@ -97,25 +97,25 @@ class CL3NPC() extends Module with NPCConfig with CL3Config {
     val ras_idx = MuxCase(
       ras_idx_spe_q,
       Seq(
-        (io.br.valid && io.br.isCall) -> (ras_idx_real_q + 1.U),
-        (io.br.valid && io.br.isRet)  -> (ras_idx_real_q - 1.U),
-        (pc_is_call && io.accept)     -> (ras_idx_spe_q + 1.U),
-        (pc_is_ret && io.accept)      -> (ras_idx_spe_q - 1.U)
+        (io.bp.valid && io.bp.isCall)  -> (ras_idx_real_q + 1.U),
+        (io.bp.valid && io.bp.isRet)   -> (ras_idx_real_q - 1.U),
+        (pc_is_call && io.info.accept) -> (ras_idx_spe_q + 1.U),
+        (pc_is_ret && io.info.accept)  -> (ras_idx_spe_q - 1.U)
       )
     )
 
-    when(io.br.valid && io.br.isCall) {
-      ras_q(ras_idx) := io.br.source + 4.U
-    }.elsewhen(pc_is_call && io.accept) {
-      ras_q(ras_idx) := Mux(btb_hit_hi, io.pc | 4.U, io.pc) + 4.U
+    when(io.bp.valid && io.bp.isCall) {
+      ras_q(ras_idx) := io.bp.source + 4.U
+    }.elsewhen(pc_is_call && io.info.accept) {
+      ras_q(ras_idx) := Mux(btb_hit_hi, io.info.pc | 4.U, io.info.pc) + 4.U
     }
 
     // --- BHT (Branch History Table) & G-Share ---
 
-    // Global history Register (actullay), update when branch is resolved
+    // Global history Register (actually), update when branch is resolved
     val ghr_real_q = RegInit(0.U(numBhtEntriesWidth.W))
-    when(io.br.valid && (io.br.isTaken || io.br.isNotTaken)) {
-      ghr_real_q := ghr_real_q(numBhtEntriesWidth - 2, 0) ## io.br.isTaken
+    when(io.bp.valid && (io.bp.isTaken || io.bp.isNotTaken)) {
+      ghr_real_q := ghr_real_q(numBhtEntriesWidth - 2, 0) ## io.bp.isTaken
     }
 
     // Global history Register (speculative)
@@ -124,38 +124,38 @@ class CL3NPC() extends Module with NPCConfig with CL3Config {
     val pred_taken     = Wire(Bool())
     val pred_not_taken = Wire(Bool())
 
-    when(io.br.valid) {
-      ghr_q := ghr_real_q(numBhtEntriesWidth - 2, 0) ## io.br.isTaken
+    when(io.bp.valid) {
+      ghr_q := ghr_real_q(numBhtEntriesWidth - 2, 0) ## io.bp.isTaken
     }.elsewhen(pred_taken || pred_not_taken) {
       ghr_q := ghr_q(numBhtEntriesWidth - 2, 0) ## pred_taken
     }
 
     // Gshare
-    val bht_rd_idx = ghr_q ^ (io.pc(3 + numBhtEntriesWidth - 2, 3) ## btb_hit_hi)
+    val bht_rd_idx = ghr_q ^ (io.info.pc(3 + numBhtEntriesWidth - 2, 3) ## btb_hit_hi)
 
     val bht_q        = RegInit(VecInit(Seq.fill(numBhtEntries)(3.U(2.W))))
     val bht_is_taken = bht_q(bht_rd_idx) >= 2.U
 
     // BHT Update
-    val wr_ghr     = Mux(io.br.valid, ghr_real_q, ghr_q)
-    val bht_wr_idx = wr_ghr ^ io.br.source(2 + numBhtEntriesWidth - 1, 2)
+    val wr_ghr     = Mux(io.bp.valid, ghr_real_q, ghr_q)
+    val bht_wr_idx = wr_ghr ^ io.bp.source(2 + numBhtEntriesWidth - 1, 2)
 
     val bht_data   = bht_q(bht_wr_idx)
-    when(io.br.isTaken && bht_data =/= 3.U) {
+    when(io.bp.isTaken && bht_data =/= 3.U) {
       bht_q(bht_wr_idx) := bht_data + 1.U
-    }.elsewhen(io.br.isNotTaken && bht_data =/= 0.U) {
+    }.elsewhen(io.bp.isNotTaken && bht_data =/= 0.U) {
       bht_q(bht_wr_idx) := bht_data - 1.U
     }
     val bp_trigger = btb_hit && (pc_is_ret || bht_is_taken || btb_entry.isJmp)
-    pred_taken     := bp_trigger && io.accept
-    pred_not_taken := btb_hit && !pred_taken && io.accept
+    pred_taken     := bp_trigger && io.info.accept
+    pred_not_taken := btb_hit && !pred_taken && io.info.accept
 
-    io.npc := Mux(pc_is_ret, ras_npc, Mux(bht_is_taken || btb_entry.isJmp, btb_entry.target, pc_plus_8))
+    io.info.npc := Mux(pc_is_ret, ras_npc, Mux(btb_hit && (bht_is_taken || btb_entry.isJmp), btb_entry.target, pc_plus_8))
 
-    io.taken := Mux(bp_trigger, Mux(io.pc(2), btb_hit_hi ## 0.U(1.W), btb_hit_hi ## !btb_hit_hi), 0.U(2.W))
+    io.info.taken := Mux(bp_trigger, Mux(io.info.pc(2), btb_hit_hi ## 0.U(1.W), btb_hit_hi ## !btb_hit_hi), 0.U(2.W))
 
   } else {
-    io.pc    := pc_plus_8
-    io.taken := false.B
+    io.info.npc    := pc_plus_8
+    io.info.taken := false.B
   }
 }

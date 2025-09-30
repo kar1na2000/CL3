@@ -49,7 +49,7 @@ object OP0Field extends DecodeField[InstructionPattern, UInt] {
       case "bltu" => BitPat(OP0_SLT)
       case "bgeu" => BitPat(OP0_SLTU)
       // case _      => BitPat.dontCare(OP0_WIDTH)
-      case _ => BitPat(OP0_SLTU)
+      case _      => BitPat(OP0_SLTU)
     }
 
     val r = op.name match {
@@ -85,7 +85,6 @@ object OP1Field extends DecodeField[InstructionPattern, UInt] {
 
   def genTable(op: InstructionPattern): BitPat = {
 
-
     val b = op.name match {
       case "beq"  => BitPat(OP1_BEQ)
       case "blt"  => BitPat(OP1_BLT)
@@ -108,7 +107,7 @@ object OP1Field extends DecodeField[InstructionPattern, UInt] {
   }
 }
 
-object OP2Field extends DecodeField[InstructionPattern, UInt] {
+object OP2Field     extends DecodeField[InstructionPattern, UInt] {
   def name: String = " OP2 "
 
   def chiselType: UInt = UInt(OP2_WIDTH.W)
@@ -126,7 +125,7 @@ object OP2Field extends DecodeField[InstructionPattern, UInt] {
     }
   }
 }
-object IllegalField extends BoolDecodeField[InstructionPattern] {
+object IllegalField extends BoolDecodeField[InstructionPattern]   {
   def name: String = "illegal instruction"
 
   def genTable(op: InstructionPattern): BitPat = {
@@ -228,6 +227,7 @@ class CL3Decoder extends Module {
 
   val io = IO(new Bundle {
     val inst = Input(UInt(32.W))
+    val pc   = Input(UInt(32.W))
     val out  = Output(new DEInfo())
   })
 
@@ -250,8 +250,7 @@ class CL3Decoder extends Module {
 
   io.out.inst := io.inst
 
-  //TODO: use BoringUtil API
-  io.out.pc := 0.U
-
+  // TODO: use BoringUtil API
+  io.out.pc := io.pc
 
 }

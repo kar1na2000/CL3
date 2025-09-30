@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 class FEIO extends Bundle {
-  val mem   = new Cl3ICacheIO
+  val mem   = new CL3ICacheIO
   val br    = Input(new BrInfo)
   val de    = Decoupled(new FEInfo)
   val bp    = Flipped(new NPCIO)
@@ -54,7 +54,7 @@ class CL3Fetch() extends Module with CL3Config {
   } else {
 
     branch      := branch_q || io.br.valid
-    branch_pc   := Mux(branch_q && !io.br.valid, branch_q, io.br.pc)
+    branch_pc   := Mux(branch_q && !io.br.valid, branch_pc_q, io.br.pc)
     branch_priv := 0.U
 
     when(io.br.valid && (mem_is_busy || !active_q)) {
@@ -134,9 +134,14 @@ class CL3Fetch() extends Module with CL3Config {
     last_pred_q := 0.U
   }
 
+  //TODO:
   io.mem.req.valid           := active_q && io.de.ready && !mem_is_busy
+  io.mem.req.bits.wdata      := 0.U
+  io.mem.req.bits.mask       := "b1111".U
+  io.mem.req.bits.cacheable  := true.B // TODO:
+  io.mem.req.bits.size       := 3.U
+  io.mem.req.bits.wen        := false.B
   io.mem.req.bits.addr       := Cat(icache_pc(31, 3), 0.U(3.W))
-  io.mem.req.bits.priv       := icache_priv
   io.mem.req.bits.flush      := io.flush || flush_q
   io.mem.req.bits.invalidate := false.B
 
@@ -155,7 +160,7 @@ class CL3Fetch() extends Module with CL3Config {
 
   io.de.valid      := fetch_valid || skid_valid_q
   io.de.bits.pc    := Mux(skid_valid_q, skid_buffer_q.pc, fetch_pc)
-  io.de.bits.inst  := Mux(skid_valid_q, skid_buffer_q.inst, io.mem.resp.bits.inst)
+  io.de.bits.inst  := Mux(skid_valid_q, skid_buffer_q.inst, io.mem.resp.bits.rdata)
   io.de.bits.pred  := Mux(skid_valid_q, skid_buffer_q.pred, last_pred_q)
   io.de.bits.fault := Mux(skid_valid_q, skid_buffer_q.fault, io.mem.resp.bits.err)
 

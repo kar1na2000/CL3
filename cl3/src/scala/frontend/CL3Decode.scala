@@ -14,7 +14,7 @@ class FetchFIFO() extends Module with FetchFIFOConfig {
   val io = IO(new Bundle {
     val flush = Input(Bool())
     val in    = Flipped(Decoupled(new FetchFIFOInput))
-    val out  = Vec(2, Decoupled(new FetchFIFOOutput))
+    val out   = Vec(2, Decoupled(new FetchFIFOOutput))
   })
 
   class FIFOEntry() extends Bundle {
@@ -89,9 +89,9 @@ class FetchFIFO() extends Module with FetchFIFOConfig {
 }
 
 class DEIO extends Bundle {
-  val br   = Input(new BrInfo)
-  val in   = Flipped(Decoupled(Input(new FEInfo)))
-  val out  = Vec(2, Decoupled(Output(new DEInfo)))
+  val br  = Input(new BrInfo)
+  val in  = Flipped(Decoupled(Input(new FEInfo)))
+  val out = Vec(2, Decoupled(Output(new DEInfo)))
 }
 
 class CL3Decode extends Module {
@@ -111,14 +111,14 @@ class CL3Decode extends Module {
   fifo.io.in.bits.info1 := info
   io.in.ready           := fifo.io.in.ready
 
-
   val decoder = Seq.fill(2)(Module(new CL3Decoder))
 
-  for(i <- 0 until 2) {
+  for (i <- 0 until 2) {
     decoder(i).io.inst := fifo.io.out(i).bits.inst
+    decoder(i).io.pc   := fifo.io.out(i).bits.pc
 
-    io.out(i).bits := decoder(i).io.out
-    io.out(i).valid := fifo.io.out(i).valid
+    io.out(i).bits       := decoder(i).io.out
+    io.out(i).valid      := fifo.io.out(i).valid
     fifo.io.out(i).ready := io.out(i).ready
 
   }

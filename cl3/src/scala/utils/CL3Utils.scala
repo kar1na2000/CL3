@@ -32,3 +32,14 @@ class LFSR(addrWidth: Int, initialValue: Int = 0x0001, tapValue: Int = 0xb400) e
 
   io.allocEntry := lfsr(addrWidth - 1, 0)
 }
+
+//See https://github.com/OSCPU/NutShell/blob/master/src/main/scala/utils/LookupTree.scala
+object LookupTree {
+  def apply[T <: Data](key: UInt, mapping: Iterable[(UInt, T)]): T =
+    Mux1H(mapping.map(p => (p._1 === key, p._2)))
+}
+
+object LookupTreeDefault {
+  def apply[T <: Data](key: UInt, default: T, mapping: Iterable[(UInt, T)]): T =
+    MuxLookup(key, default)(mapping.toSeq)
+}

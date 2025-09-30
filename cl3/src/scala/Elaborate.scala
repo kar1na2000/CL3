@@ -13,5 +13,5 @@ object Elaborate extends App {
     // "-o=vsrc/sv-gen",
     // "--split-verilog"
   )
-  circt.stage.ChiselStage.emitSystemVerilogFile(new CL3Decode(), args, firtoolOptions)
+  circt.stage.ChiselStage.emitSystemVerilogFile(new CL3Top(), args, firtoolOptions)
 }

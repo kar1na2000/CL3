@@ -2,10 +2,11 @@ package cl3
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.dataview._
 
-// ======== Branch Bundle ========
+// ========== Branch Prediction Bundle ========== //
 
-class BrUpdateInfo extends Bundle {
+class BpInfo extends Bundle {
   val valid      = Bool()
   val target     = UInt(32.W)
   val isTaken    = Bool()
@@ -22,7 +23,7 @@ class BrInfo extends Bundle {
   val priv  = UInt(2.W)
 }
 
-// ======== Branch Prediction Bundle ========
+// ===================  NPC Bundle =================== //
 
 class NPCIO extends Bundle {
   val pc     = Input(UInt(32.W))
@@ -31,9 +32,10 @@ class NPCIO extends Bundle {
   val taken  = Output(Bool())
 }
 
-class NPCFullIO extends NPCIO {
-  val br    = Input(new BrUpdateInfo)
+class NPCFullIO extends Bundle {
+  val bp    = Input(new BpInfo)
   val flush = Input(Bool())
+  val info  = new NPCIO
 }
 
 class FEInfo extends Bundle {
@@ -54,11 +56,24 @@ class OpInfo extends Bundle {
   val inst  = UInt(32.W)
   val pc    = UInt(32.W)
   val uop   = new MicroOp
-  val rdIdx = UInt(5.W)
-  val raIdx = UInt(5.W)
-  val rbIdx = UInt(5.W)
   val ra    = UInt(32.W)
   val rb    = UInt(32.W)
+
+  def rdIdx: UInt = inst(11, 7)
+  def raIdx: UInt = inst(19, 15)
+  def rbIdx: UInt = inst(24, 20)
+
+}
+
+object OpInfo {
+  def fromDE(de: DEInfo): OpInfo = {
+    val op = Wire(new OpInfo)
+
+    op.inst := de.inst
+    op.pc   := de.pc
+    op.uop  := de.uop
+    op
+  }
 }
 
 class DEInfo extends Bundle {
@@ -73,6 +88,10 @@ class DEInfo extends Bundle {
   val isBr    = Bool()
   val uop     = new MicroOp
   val illegal = Bool()
+
+  def rdIdx: UInt = inst(11, 7)
+  def raIdx: UInt = inst(19, 15)
+  def rbIdx: UInt = inst(24, 20)
 }
 
 class MMUCtrlInfo extends Bundle {
@@ -96,17 +115,7 @@ class FetchFIFOOutput extends Bundle with FetchFIFOConfig {
   val info = Output(UInt(opInfoWidth.W))
 }
 
-
-class CSRWBInfo extends Bundle {
-  val wen        = Bool()
-  val waddr      = UInt(12.W)
-  val wdata      = UInt(32.W)
-  val except     = UInt(6.W)
-  val exceptPC   = UInt(32.W)
-  val exceptAddr = UInt(32.W)
-}
-
-// ======== Pipe IO Bundle ========
+// ==================== Pipe Bundle =================== //
 
 class PipeISInput extends Bundle {
   val fire   = Input(Bool())
@@ -114,26 +123,26 @@ class PipeISInput extends Bundle {
   val ra     = Input(UInt(32.W))
   val rb     = Input(UInt(32.W))
   val except = Input(UInt(6.W))
-  val taken  = Input(Bool())
-  val target = Input(UInt(32.W))
+
+  def rdIdx: UInt = info.inst(11, 7)
 }
 
 class PipeLSUInput extends Bundle {
-  val complete = Input(Bool())
-  val rdata    = Input(UInt(32.W))
-  val except   = Input(UInt(6.W))
+  val valid  = Input(Bool())
+  val rdata  = Input(UInt(32.W))
+  val except = Input(UInt(6.W))
 }
 
 class PipeCSRInput extends Bundle {
-  val rdata  = Input(UInt(32.W))
   val wen    = Input(Bool())
+  val rdata  = Input(UInt(32.W))
   val wdata  = Input(UInt(32.W))
   val except = Input(UInt(6.W))
 }
 
 class PipeDIVInput extends Bundle {
-  val complete = Input(Bool())
-  val result   = Input(UInt(32.W))
+  val valid  = Input(Bool())
+  val result = Input(UInt(32.W))
 }
 
 class PipeMULInput extends Bundle {
@@ -142,27 +151,34 @@ class PipeMULInput extends Bundle {
 
 class PipeEXUInput extends Bundle {
   val result = Input(UInt(32.W))
+  val br     = Input(new BrInfo)
 }
 
 class PipeE1Output extends Bundle {
-  val valid   = Output(Bool())
-  val isLoad  = Output(Bool())
-  val isStore = Output(Bool())
-  val isMUL   = Output(Bool())
-  val isBr    = Output(Bool())
-  val rdIdx   = Output(UInt(5.W))
-  val pc      = Output(UInt(32.W))
-  val inst    = Output(UInt(32.W))
-  val ra      = Output(UInt(32.W))
-  val rb      = Output(UInt(32.W))
+  val valid = Output(Bool())
+  val isLd  = Output(Bool())
+  val isSt  = Output(Bool())
+  val isMUL = Output(Bool())
+  val isBr  = Output(Bool())
+  val pc    = Output(UInt(32.W))
+  val inst  = Output(UInt(32.W))
+  val ra    = Output(UInt(32.W))
+  val rb    = Output(UInt(32.W))
+
+  def rdIdx: UInt = inst(11, 7)
+  def isLSU: Bool = valid && (isLd || isSt)
 }
 
 class PipeE2Output extends Bundle {
   val valid  = Output(Bool())
   val isLoad = Output(Bool())
   val isMUL  = Output(Bool())
+  val pc     = Output(UInt(32.W))
+  val inst   = Output(UInt(32.W))
+  val wen    = Output(Bool())
   val result = Output(UInt(32.W))
-  val rdIdx  = Output(UInt(5.W))
+
+  def rdIdx: UInt = inst(11, 7)
 }
 
 class PipeWBOutput extends Bundle {
@@ -173,11 +189,34 @@ class PipeWBOutput extends Bundle {
   val ra     = Output(UInt(32.W))
   val rb     = Output(UInt(32.W))
   val result = Output(UInt(32.W))
-  val rdIdx  = Output(UInt(5.W))
+  val wen    = Output(Bool())
 
   val csr = new Bundle {
     val wen   = Output(Bool())
     val waddr = Output(UInt(12.W))
     val wdata = Output(UInt(32.W))
   }
+
+  def rdIdx: UInt = inst(11, 7)
+}
+
+class ISCSRInput extends Bundle {
+  val br     = Input(new BrInfo)
+  val wen    = Input(Bool())
+  val rdata  = Input(UInt(32.W))
+  val wdata  = Input(UInt(32.W))
+  val except = Input(UInt(6.W))
+}
+
+class ISEXUInput extends Bundle {
+  val br     = Input(new BrInfo)
+  val bp     = Input(new BpInfo)
+  val result = Input(UInt(32.W))
+}
+
+class ISCSROutput extends Bundle {
+  val wen    = Output(Bool())
+  val waddr  = Output(UInt(12.W))
+  val wdata  = Output(UInt(32.W))
+  val except = Output(UInt(6.W))
 }
