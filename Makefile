@@ -44,7 +44,7 @@ checkformat:
 # Clean Build Artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	$(RM) $(BUILD_DIR)
+	$(RM) ./build
 	$(RM) $(VSRC_DIR)
 
 .PHONY: $(RTLSRC_CPU)
