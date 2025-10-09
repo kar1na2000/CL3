@@ -23,7 +23,7 @@ verilog:
 	@echo "Generating Verilog files..."
 	$(MKDIR) $(VSRC_DIR)
 	$(MILL) -i $(PRJ).runMain Elaborate --target-dir $(VSRC_DIR)
-	sed -i '/difftest\.sv/d' $(VSRC_DIR)/$(CPUTOP).sv
+	sed -i '/difftest.*\.sv/d' $(VSRC_DIR)/$(CPUTOP).sv
 	sed -i '/mem_helper\.sv/d' $(VSRC_DIR)/$(CPUTOP).sv
 	
 # Show Help for Elaborate

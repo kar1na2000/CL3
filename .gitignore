@@ -5,7 +5,6 @@
 !*.mk
 !*.scala
 !*.[cSh]
-!*.v
 !*.cpp
 !*.cc
 !.gitignore
@@ -16,6 +15,7 @@
 !LICENSE
 build/
 !soc/**
+!cl3/**
 
 # mill
 out/

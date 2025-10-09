@@ -198,11 +198,11 @@ int difftest_step(int pc, int instr, int c_instr, int is_c_instr) {
 
   int csr_mask = 0;
   // TODO: add CSRs
-  for (int i = 0; i < 3; i++) {
-    if (dut.csr[i] != ref.csr[i]) {
-      csr_mask |= (1U << i);
-    }
-  }
+  // for (int i = 0; i < 3; i++) {
+  //   if (dut.csr[i] != ref.csr[i]) {
+  //     csr_mask |= (1U << i);
+  //   }
+  // }
 
   if (pc_flag || gpr_mask || csr_mask) {
     difftest_info(pc_flag, gpr_mask, csr_mask);

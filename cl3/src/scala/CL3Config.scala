@@ -8,6 +8,7 @@ trait CL3Config {
   val DataWidth    = 64
   val EnableMMU    = false
   val EnableBP     = false
+  val EnableDiff   = true
   val SimMemOption = "DPI-C"
   val BootAddr     = "h80000000".U
 }
