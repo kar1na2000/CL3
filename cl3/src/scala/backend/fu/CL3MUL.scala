@@ -21,6 +21,8 @@ class CL3MUL extends Module {
 
   val io = IO(new MULIO)
 
+  dontTouch(io)
+
   val inst  = io.in.info.inst
   val func3 = inst(14, 12)
 
@@ -47,7 +49,7 @@ class CL3MUL extends Module {
   // TODO:
   multiplier.io.valid := true.B
 
-  io.out.result := Mux(func3_q.orR, multiplier.io.res(31, 0), multiplier.io.res(63, 32))
+  io.out.result := Mux(func3_q.orR, multiplier.io.res(63, 32), multiplier.io.res(31, 0))
 }
 
 class C32 extends Module {
@@ -79,8 +81,8 @@ class BoothMultiplier(len: Int) extends Module {
 
   val io = IO(new Bundle {
     val valid  = Input(Bool())
-    val ra     = Input(UInt(32.W))
-    val rb     = Input(UInt(32.W))
+    val ra     = Input(UInt(33.W))
+    val rb     = Input(UInt(33.W))
     val res    = Output(UInt(64.W))
     val finish = Output(Bool())
   })

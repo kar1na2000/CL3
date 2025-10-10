@@ -11,9 +11,8 @@ class LSUInput extends Bundle {
 }
 
 class LSUOutput extends Bundle {
-  val mem   = Decoupled(new CL3DCacheReq)
-  val stall = Output(Bool())
-  val info  = Flipped(new PipeLSUInput)
+  val mem  = Decoupled(new CL3DCacheReq)
+  val info = Flipped(new PipeLSUInput)
 }
 
 class LSUIO extends Bundle {
@@ -42,7 +41,7 @@ class CL3LSU extends Module with LSUConstant {
   val addr = io.in.info.ra + Mux(is_load, Iimm, Simm)
 
   // TODO: refactor MuxLookup to improve timing
-  val mask = MuxLookup(addr(1, 0) ## op(3, 2), MASK_Z)(
+  val mask = MuxLookup(addr(1, 0) ## op(2, 1), MASK_Z)(
     Seq(
       // 1 byte
       "b0001".U -> MASK_B0,
@@ -88,9 +87,8 @@ class CL3LSU extends Module with LSUConstant {
     req_valid_q := false.B
   }
 
-  io.out.mem.valid := req_valid_q
-  io.out.mem.bits  := req_q
-
+  io.out.mem.valid      := req_valid_q
+  io.out.mem.bits       := req_q
   // TODO: refactor MuxLookup to improve timing
   io.out.mem.bits.wdata := MuxLookup(req_q.mask, req_q.wdata)(
     Seq(
@@ -100,8 +98,6 @@ class CL3LSU extends Module with LSUConstant {
       MASK_HI -> req_q.wdata(15, 0) ## 0.U(16.W)
     )
   )
-
-  io.out.mem.bits := req_q
 
   class ReqRecord extends Bundle {
     val mask = UInt(4.W)
@@ -138,7 +134,7 @@ class CL3LSU extends Module with LSUConstant {
 
   io.out.info.valid  := io.in.mem.valid && outstanding_q
   io.out.info.except := 0.U // TODO:
-  io.out.stall       := pending || io.out.mem.valid && !io.out.mem.ready
+  io.out.info.stall  := pending || io.out.mem.valid && !io.out.mem.ready
 
 }
 

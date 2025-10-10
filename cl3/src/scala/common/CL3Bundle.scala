@@ -131,6 +131,7 @@ class PipeLSUInput extends Bundle {
   val valid  = Input(Bool())
   val rdata  = Input(UInt(32.W))
   val except = Input(UInt(6.W))
+  val stall  = Input(Bool())
 }
 
 class PipeCSRInput extends Bundle {
@@ -164,6 +165,7 @@ class PipeE1Output extends Bundle {
   val inst  = Output(UInt(32.W))
   val ra    = Output(UInt(32.W))
   val rb    = Output(UInt(32.W))
+  val wen   = Output(Bool())
 
   def rdIdx: UInt = inst(11, 7)
   def isLSU: Bool = valid && (isLd || isSt)

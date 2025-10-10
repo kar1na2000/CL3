@@ -48,8 +48,8 @@ class CL3Fetch() extends Module with CL3Config {
       branch_pc_q   := io.br.pc
       branch_priv_q := io.br.priv
     }.elsewhen(io.mem.req.fire) {
-      branch    := false.B
-      branch_pc := 0.U
+      branch_q    := false.B
+      branch_pc_q := 0.U
     }
   } else {
 
@@ -57,7 +57,7 @@ class CL3Fetch() extends Module with CL3Config {
     branch_pc   := Mux(branch_q && !io.br.valid, branch_pc_q, io.br.pc)
     branch_priv := 0.U
 
-    when(io.br.valid && (mem_is_busy || !active_q)) {
+    when(io.br.valid && mem_is_busy) {
       branch_q    := branch
       branch_pc_q := branch_pc
     }.elsewhen(!mem_is_busy) {
@@ -118,7 +118,7 @@ class CL3Fetch() extends Module with CL3Config {
     icache_priv := priv_q
     drop_resp   := (branch || last_branch_q)
   } else {
-    icache_pc   := Mux(branch && !stall, branch_pc, pc_q)
+    icache_pc   := Mux(branch && !stall_q, branch_pc, pc_q)
     icache_priv := 0.U
     drop_resp   := branch
   }
@@ -134,7 +134,7 @@ class CL3Fetch() extends Module with CL3Config {
     last_pred_q := 0.U
   }
 
-  //TODO:
+  // TODO:
   io.mem.req.valid           := active_q && io.de.ready && !mem_is_busy
   io.mem.req.bits.wdata      := 0.U
   io.mem.req.bits.mask       := "b1111".U
@@ -148,6 +148,7 @@ class CL3Fetch() extends Module with CL3Config {
   val skid_buffer_q = RegInit(0.U.asTypeOf(new FEInfo))
   val skid_valid_q  = RegInit(false.B)
 
+  // TODO: power
   when(io.de.valid && !io.de.ready) {
     skid_valid_q  := true.B
     skid_buffer_q := io.de.bits

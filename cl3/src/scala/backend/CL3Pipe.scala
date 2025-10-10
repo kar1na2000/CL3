@@ -59,17 +59,20 @@ class CL3Pipe() extends Module {
 
   }.elsewhen(e1_flush && !io.in.stall) {
     e1_q.valid := false.B
+  }.elsewhen(!io.in.stall) {
+    e1_q.valid := io.in.issue.fire
   }
 
   io.out.e1.valid := e1_q.valid
   io.out.e1.inst  := e1_q.info.inst
   io.out.e1.isBr  := e1_q.info.isBr
-  io.out.e1.isLd  := e1_q.info.isLSU && !e1_q.info.wen
-  io.out.e1.isSt  := e1_q.info.isLSU && e1_q.info.wen
+  io.out.e1.isLd  := e1_q.info.isLSU && e1_q.info.wen
+  io.out.e1.isSt  := e1_q.info.isLSU && !e1_q.info.wen
   io.out.e1.isMUL := e1_q.info.isMUL
   io.out.e1.pc    := e1_q.info.pc
   io.out.e1.ra    := e1_q.ra
   io.out.e1.rb    := e1_q.rb
+  io.out.e1.wen   := e1_q.info.wen
 
   class E2Data extends Bundle {
     val valid  = Bool()
@@ -109,13 +112,12 @@ class CL3Pipe() extends Module {
   }
 
   io.out.e2.valid  := e2_q.valid
-  io.out.e2.isLoad := e2_q.info.isLSU && !e2_q.info.wen
+  io.out.e2.isLoad := e2_q.info.isLSU && e2_q.info.wen
   io.out.e2.isMUL  := e2_q.info.isMUL
   io.out.e2.pc     := e2_q.info.pc
   io.out.e2.inst   := e2_q.info.inst
 
-// 'wen' means the e2 result can be used for bypass
-  io.out.e2.wen := !(io.in.stall || io.out.stall)
+  io.out.e2.wen := !(io.in.stall || io.out.stall) && e2_q.info.wen
 
   io.out.e2.result := MuxCase(
     e2_q.result,
@@ -159,12 +161,10 @@ class CL3Pipe() extends Module {
     wb_q.csr.wdata := e2_q.csr.wdata
     wb_q.csr.wen   := e2_q.csr.wen
     wb_q.wen       := io.out.e2.wen
-    wb_q.result    := e2_q.result
+    wb_q.result    := io.out.e2.result
   }
 
-  when(!io.in.stall && !io.in.flushWB) {
-    wb_q.valid := e2_q.valid
-  }
+  wb_q.valid := e2_q.valid && !io.in.stall && !io.in.flushWB
 
   io.out.wb.commit := wb_q.valid
 
@@ -177,4 +177,18 @@ class CL3Pipe() extends Module {
   io.out.wb.result := wb_q.result
   io.out.wb.wen    := wb_q.wen
 
+  def bypass(idx: UInt, data: UInt): UInt = {
+    val bypassed_data = MuxCase(
+      data,
+      Seq(
+        ((idx =/= 0.U) && io.out.e1.valid && io.out.e1.wen && (idx === io.out.e1.rdIdx))
+          -> io.in.exu.result,
+        ((idx =/= 0.U) && io.out.e2.valid && io.out.e2.wen && (idx === io.out.e2.rdIdx))
+          -> io.out.e2.result,
+        ((idx =/= 0.U) && io.out.wb.commit && io.out.wb.wen && (idx === io.out.wb.rdIdx))
+          -> io.out.wb.result
+      )
+    )
+    bypassed_data
+  }
 }

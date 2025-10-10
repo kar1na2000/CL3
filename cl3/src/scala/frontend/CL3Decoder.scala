@@ -40,16 +40,14 @@ object OP0Field extends DecodeField[InstructionPattern, UInt] {
       case "srli"  => BitPat(OP0_SRL)
       case "slli"  => BitPat(OP0_SLL)
       case "ori"   => BitPat(OP0_OR)
-      case "jalr"  => BitPat(OP0_ADD)
-      // case _       => BitPat.dontCare(OP0_WIDTH)
+      case "jalr"  => BitPat(OP0_NONE)
       case _       => BitPat(OP0_ADD)
     }
 
     val b = op.name match {
-      case "bltu" => BitPat(OP0_SLT)
+      case "bltu" => BitPat(OP0_SLTU)
       case "bgeu" => BitPat(OP0_SLTU)
-      // case _      => BitPat.dontCare(OP0_WIDTH)
-      case _      => BitPat(OP0_SLTU)
+      case _      => BitPat(OP0_SLT)
     }
 
     val r = op.name match {
@@ -88,15 +86,21 @@ object OP1Field extends DecodeField[InstructionPattern, UInt] {
     val b = op.name match {
       case "beq"  => BitPat(OP1_BEQ)
       case "blt"  => BitPat(OP1_BLT)
-      case "bltu" => BitPat(OP1_BLTU)
+      case "bltu" => BitPat(OP1_BLT)
       case "bne"  => BitPat(OP1_BNE)
-      case "bge"  => BitPat(OP1_BLTU)
-      case "bgeu" => BitPat(OP1_BGEU)
+      case "bge"  => BitPat(OP1_BGE)
+      case "bgeu" => BitPat(OP1_BGE)
       case _      => BitPat.dontCare(OP1_WIDTH)
     }
 
+    val u = op.name match {
+      case "lui"   => BitPat(OP1_Z)
+      case "auipc" => BitPat(OP1_PC)
+      case _       => BitPat.dontCare(OP1_WIDTH)
+    }
+
     op.instType match {
-      case "U" => BitPat(OP1_PC)
+      case "U" => u
       case "J" => BitPat(OP1_PC)
       case "I" => BitPat(OP1_REG)
       case "B" => b
@@ -118,7 +122,7 @@ object OP2Field     extends DecodeField[InstructionPattern, UInt] {
       case "U" => BitPat(OP2_IMMU)
       case "J" => BitPat(OP2_IMMJ)
       case "I" => BitPat(OP2_IMMI)
-      case "B" => BitPat(OP2_IMMB)
+      case "B" => BitPat(OP2_REG)
       case "S" => BitPat(OP2_REG)
       case "R" => BitPat(OP2_REG)
       case _   => BitPat.dontCare(OP2_WIDTH)

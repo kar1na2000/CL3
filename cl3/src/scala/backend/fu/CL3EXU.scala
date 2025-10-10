@@ -28,10 +28,10 @@ class CL3EXU extends Module with OpConstant {
   val Bimm = SignExt(Cat(inst(31), inst(7), inst(30, 25), inst(11, 8), 0.U(1.W)), 32)
   val Jimm = SignExt(Cat(inst(31), inst(19, 12), inst(20), inst(30, 25), inst(24, 21), 0.U(1.W)), 32)
 
-  val alu_input_a = MuxLookup(io.in.info.uop.op1, 0.U)(
+  val alu_input_a = MuxLookup(io.in.info.uop.op1, io.in.info.ra)(
     Seq(
-      OP1_REG -> io.in.info.ra,
-      OP1_PC  -> io.in.info.pc
+      OP1_PC -> io.in.info.pc,
+      OP1_Z  -> 0.U
     )
   )
 
@@ -53,35 +53,23 @@ class CL3EXU extends Module with OpConstant {
 
   val alu_res = alu.io.res
 
-  val result_q = RegInit(0.U(32.W))
-  when(!io.in.hold) {
-    result_q := alu_res
-  }
-
-  io.out.info.result := result_q
-
-  // TODO: using OP_NONE as an indicator value for branch/jump instructions is not very elegant.
-  val isBr = !io.in.info.uop.op0.orR
-
+  val isBr   = io.in.info.uop.op1.orR && !io.in.info.uop.op1.andR
   val isJal  = io.in.info.uop.op2.andR
-  val isJalr = io.in.info.uop.op1.andR &&
-    io.in.info.uop.op2 === OP2_IMMI && isBr
+  val isJalr = !io.in.info.uop.op0.orR
 
   val taken = isJal || isJalr || MuxLookup(io.in.info.uop.op1, false.B)(
     Seq(
-      OP1_BEQ  -> alu.io.eq,
-      OP1_BLT  -> alu.io.lt,
-      OP1_BLTU -> alu.io.lt,
-      OP1_BNE  -> !alu.io.eq,
-      OP1_BGE  -> !alu.io.lt,
-      OP1_BGEU -> !alu.io.lt
+      OP1_BEQ -> alu.io.eq,
+      OP1_BLT -> alu.io.lt,
+      OP1_BNE -> !alu.io.eq,
+      OP1_BGE -> !alu.io.lt
     )
   )
 
-  val br_target  = io.in.info.pc + Iimm
+  val br_target  = io.in.info.pc + Bimm
   val jmp_target = alu.io.res
 
-  io.out.info.br.valid := io.in.info.valid && isBr && taken
+  io.out.info.br.valid := io.in.info.valid && taken
   io.out.info.br.pc    := Mux(isJal || isJalr, jmp_target, br_target)
   io.out.info.br.priv  := 0.U
 
@@ -105,6 +93,12 @@ class CL3EXU extends Module with OpConstant {
 
   io.out.info.bp := bp_q
 
+  val result_q = RegInit(0.U(32.W))
+  when(!io.in.hold) {
+    result_q := Mux(isJal || isJalr, io.in.info.pc + 4.U, alu_res)
+  }
+
+  io.out.info.result := result_q
 }
 
 class CL3ALU extends Module with OpConstant {

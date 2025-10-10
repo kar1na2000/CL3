@@ -34,7 +34,7 @@ class FetchFIFO() extends Module with FetchFIFOConfig {
   val is_full  = (count_q === FIFODepth.U)
   val is_empty = (count_q === 0.U)
 
-  io.in.ready := !is_full
+  io.in.ready := !is_full && !io.flush
 
   val head = entry_vec(rd_ptr_q)
 
@@ -47,7 +47,13 @@ class FetchFIFO() extends Module with FetchFIFOConfig {
 
   val pop_complete = !is_empty && ((pop0 && !head.valid1) || (pop1 && !head.valid0) || (pop0 && pop1))
 
-  when(push) {
+  when(io.flush) {
+    wr_ptr_q := 0.U
+    for (i <- 0 until FIFODepth) {
+      entry_vec(i) := 0.U.asTypeOf(new FIFOEntry)
+    }
+
+  }.elsewhen(push) {
     entry_vec(wr_ptr_q).pc     := io.in.bits.pc
     entry_vec(wr_ptr_q).inst   := io.in.bits.data
     entry_vec(wr_ptr_q).info0  := io.in.bits.info0
@@ -66,11 +72,15 @@ class FetchFIFO() extends Module with FetchFIFOConfig {
     entry_vec(rd_ptr_q).valid1 := false.B
   }
 
-  when(pop_complete) {
+  when(io.flush) {
+    rd_ptr_q := 0.U
+  }.elsewhen(pop_complete) {
     rd_ptr_q := rd_ptr_q + 1.U
   }
 
-  when(push && !pop_complete) {
+  when(io.flush) {
+    count_q := 0.U
+  }.elsewhen(push && !pop_complete) {
     count_q := count_q + 1.U
   }.elsewhen(!push && pop_complete) {
     count_q := count_q - 1.U

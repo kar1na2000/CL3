@@ -24,7 +24,7 @@ class CL3IssueIO extends Bundle {
   }
 }
 
-class CL3Issue extends Module {
+class CL3Issue extends Module with CL3Config {
   val io = IO(new CL3IssueIO)
 
   val fetch0 = io.in.fetch(0)
@@ -52,16 +52,15 @@ class CL3Issue extends Module {
     pc_q := pc_q + 4.U
   }
 
-  // The 'fetchx.valid' signal simply indicates that the fetch unit is providing data.
-  // The 'fetchx_ok' signal confirms this instruction is the correct one to be processed next
-  // (i.e., PC matches and no pipeline flush is active).
+  dontTouch(io)
 
-  //TODO: support RVC will change this logic
-  //TODO: optimize PC match logic to support more dual-issue cases
+  // TODO: support RVC will change this logic
+  // TODO: optimize PC match logic to support more dual-issue cases
 
   val fetch0_pc_match = fetch0.bits.pc === (pc_q(31, 2) ## 0.U(2.W))
   val fetch1_pc_match = fetch1.bits.pc === (pc_q(31, 2) ## 0.U(2.W))
 
+  // The 'fetchx.valid' signal simply indicates that the fetch unit is providing data.
   val fetch0_ok = fetch0.valid && fetch0_pc_match && !(flush || io.in.csr.br.valid)
   val fetch1_ok = fetch1.valid && fetch1_pc_match && !(flush || io.in.csr.br.valid)
 
@@ -128,19 +127,18 @@ class CL3Issue extends Module {
   // TODO: use a better way (move scoreboard to a seperate class)
   for (i <- 0 until 32) {
 
-    val lsu_pending = pipe0.io.out.e1.isLSU || pipe0.io.out.e1.isLSU
-
     // TODO: maybe we can use a function to do this
 
-    val data_hazard1 = (pipe0.io.out.e1.isLd || pipe0.io.out.e1.isMUL) && (i.U === pipe0.io.out.e1.rdIdx)
-    val data_hazard2 = (pipe1.io.out.e1.isLd || pipe1.io.out.e1.isMUL) && (i.U === pipe1.io.out.e1.rdIdx)
+    val data_hazard1 =
+      pipe0.io.out.e1.valid && (pipe0.io.out.e1.isLd || pipe0.io.out.e1.isMUL) && (i.U === pipe0.io.out.e1.rdIdx)
+    val data_hazard2 =
+      pipe0.io.out.e1.valid && (pipe1.io.out.e1.isLd || pipe1.io.out.e1.isMUL) && (i.U === pipe1.io.out.e1.rdIdx)
 
-    val order_hazard = lsu_pending && (slot(0).bits.isMUL || slot(0).bits.isDIV || slot(0).bits.isCSR)
+    val order_hazard = (pipe0.io.out.e1.isLSU || pipe1.io.out.e1.isLSU) &&
+      (slot(0).bits.isMUL || slot(0).bits.isDIV || slot(0).bits.isCSR)
 
-    val data_hazard3 =
-      (slot(0).valid && slot(0).bits.wen && pipe0.io.in.issue.rdIdx.orR) && i.U === pipe0.io.in.issue.rdIdx
-
-    scoreboard(i) := data_hazard3 || data_hazard2 || data_hazard1 || order_hazard
+    // TODO: Data hazard between two slots
+    scoreboard(i) := data_hazard2 || data_hazard1 || order_hazard
   }
 
   val rf = Module(new CL3RF())
@@ -153,90 +151,69 @@ class CL3Issue extends Module {
 
   val slot0_op = OpInfo.fromDE(slot(0).bits)
   slot0_op.valid := slot(0).valid
-  slot0_op.ra    := MuxCase(
-    rf.io.rd(0).rdata,
-    Seq(
-      (slot(0).bits.raIdx === pipe0.io.out.wb.rdIdx) -> pipe0.io.out.wb.result,
-      (slot(0).bits.raIdx === pipe0.io.out.e2.rdIdx) -> pipe0.io.out.e2.result,
-      (slot(0).bits.raIdx === pipe0.io.out.e1.rdIdx) -> io.in.exec(0).result
-    )
-  )
+  slot0_op.ra    := pipe0.bypass(slot(0).bits.raIdx, rf.io.rd(0).rdata)
+  slot0_op.rb    := pipe0.bypass(slot(0).bits.rbIdx, rf.io.rd(1).rdata)
 
-  slot0_op.rb          := MuxCase(
-    rf.io.rd(1).rdata,
-    Seq(
-      (slot(0).bits.rbIdx === pipe0.io.out.wb.rdIdx) -> pipe0.io.out.wb.result,
-      (slot(0).bits.rbIdx === pipe0.io.out.e2.rdIdx) -> pipe0.io.out.e2.result,
-      (slot(0).bits.rbIdx === pipe0.io.out.e1.rdIdx) -> io.in.exec(0).result
-    )
-  )
   pipe0.io.in.issue.ra := slot0_op.ra
   pipe0.io.in.issue.rb := slot0_op.rb
 
   val slot1_op = OpInfo.fromDE(slot(1).bits)
   slot1_op.valid := slot(1).valid
-  slot1_op.ra    := MuxCase(
-    rf.io.rd(2).rdata,
-    Seq(
-      (slot(1).bits.raIdx === pipe1.io.out.wb.rdIdx) -> pipe1.io.out.wb.result,
-      (slot(1).bits.raIdx === pipe1.io.out.e2.rdIdx) -> pipe1.io.out.e2.result,
-      (slot(1).bits.raIdx === pipe1.io.out.e1.rdIdx) -> io.in.exec(1).result
-    )
-  )
-  slot1_op.rb    := MuxCase(
-    rf.io.rd(3).rdata,
-    Seq(
-      (slot(1).bits.raIdx === pipe1.io.out.wb.rdIdx) -> pipe1.io.out.wb.result,
-      (slot(1).bits.raIdx === pipe1.io.out.e2.rdIdx) -> pipe1.io.out.e2.result,
-      (slot(1).bits.raIdx === pipe1.io.out.e1.rdIdx) -> io.in.exec(1).result
-    )
-  )
+  slot1_op.ra    := pipe1.bypass(slot(1).bits.raIdx, rf.io.rd(2).rdata)
+  slot1_op.rb    := pipe1.bypass(slot(1).bits.rbIdx, rf.io.rd(3).rdata)
 
   pipe1.io.in.issue.ra := slot1_op.ra
   pipe1.io.in.issue.rb := slot1_op.rb
 
   val slot0_fire = slot0_op.valid &&
-    !(scoreboard(slot0_op.raIdx) || scoreboard(slot0_op.rbIdx))
+    !(scoreboard(slot0_op.raIdx) || scoreboard(slot0_op.rbIdx)) &&
+    !io.in.lsu.stall
 
   val slot1_fire = slot1_op.valid &&
-    !(scoreboard(slot1_op.raIdx) || scoreboard(slot1_op.rbIdx) || scoreboard(slot1_op.rdIdx)) &&
+    !(scoreboard(slot1_op.raIdx) || scoreboard(slot1_op.rbIdx)) &&
+    !io.in.lsu.stall &&
     slot0_fire &&
     dual_issue_check
 
-  pipe0.io.in.issue.fire := slot0_fire
-  pipe1.io.in.issue.fire := slot1_fire
-
 // TODO: CSR
-  rf.io.wr(0).wen   := pipe0.io.out.wb.wen
+  rf.io.wr(0).wen   := pipe0.io.out.wb.wen && pipe0.io.out.wb.commit
   rf.io.wr(0).waddr := pipe0.io.out.wb.rdIdx
   rf.io.wr(0).wdata := pipe0.io.out.wb.result
 
-  rf.io.wr(1).wen   := pipe1.io.out.wb.wen
+  rf.io.wr(1).wen   := pipe1.io.out.wb.wen && pipe0.io.out.wb.commit
   rf.io.wr(1).waddr := pipe1.io.out.wb.rdIdx
   rf.io.wr(1).wdata := pipe1.io.out.wb.result
 
   // EXU 0
-  io.out.op(0) := slot0_op
+  io.out.op(0)       := slot0_op
+  io.out.op(0).valid := pipe0.io.in.issue.fire
 
   // EXU 1
-  io.out.op(1) := slot1_op
+  io.out.op(1)       := slot1_op
+  io.out.op(1).valid := pipe1.io.in.issue.fire
 
   // LSU
-  val lsu_op = Mux(slot(1).bits.isLSU, slot1_op, slot0_op)
+  val slot0_issue_lsu = slot(0).bits.isLSU && slot0_fire
+  val slot1_issue_lsu = slot(1).bits.isLSU && slot1_fire
+
+  val lsu_op = Mux(slot0_issue_lsu, slot0_op, slot1_op)
   io.out.op(2)       := lsu_op
-  io.out.op(2).valid := lsu_op.valid &&  ~io.in.irq && (slot(0).bits.isLSU || slot(1).bits.isLSU)
+  io.out.op(2).valid := lsu_op.valid && ~io.in.irq && (slot0_issue_lsu || slot1_issue_lsu)
 
   // MUL
-  val mul_op = Mux(slot(1).bits.isMUL, slot1_op, slot0_op)
+  val slot0_issue_mul = slot(0).bits.isMUL && slot0_fire
+  val slot1_issue_mul = slot(1).bits.isMUL && slot1_fire
+
+  val mul_op = Mux(slot0_issue_mul, slot0_op, slot1_op)
   io.out.op(3)       := mul_op
-  io.out.op(3).valid := mul_op.valid && ~io.in.irq
+  io.out.op(3).valid := mul_op.valid && ~io.in.irq && (slot0_issue_mul || slot1_issue_mul)
 
   // DIV
   io.out.op(4)       := slot0_op
-  io.out.op(4).valid := slot0_op.valid && slot(0).bits.isDIV
+  io.out.op(4).valid := pipe0.io.in.issue.fire && slot(0).bits.isDIV
 
   val div_pending_q = RegInit(false.B)
-  when(pipe0.io.out.flush || pipe1.io.out.flush) {
+  when(pipe0.io.in.flush || pipe1.io.in.flush) {
     div_pending_q := false.B
   }.elsewhen(io.out.op(4).valid) {
     div_pending_q := true.B
@@ -248,17 +225,8 @@ class CL3Issue extends Module {
   io.out.op(5)       := slot0_op
   io.out.op(5).valid := slot0_op.valid && ~io.in.irq && slot(0).bits.isCSR
 
-  val csr_pending_q = RegInit(false.B)
-  when(pipe0.io.in.flush || pipe1.io.out.flush) {
-    csr_pending_q := false.B
-  }.elsewhen(io.out.op(5).valid) {
-    csr_pending_q := true.B
-  }.elsewhen(io.in.csr.wen) { // TODO: check here
-    csr_pending_q := false.B
-  }
-
-  dual_issue   := slot1_op.valid && !io.in.irq
-  single_issue := slot0_op.valid && !dual_issue && !io.in.irq
+  dual_issue   := pipe1.io.in.issue.fire && !io.in.irq
+  single_issue := pipe0.io.in.issue.fire && !dual_issue && !io.in.irq
 
   // Branch
   io.out.br.valid := mispred || io.in.csr.br.valid
@@ -275,7 +243,25 @@ class CL3Issue extends Module {
 
   // handshake
 
-  io.in.fetch(0).ready := (fetch0_ok && pipe0.io.in.issue.fire || fetch1_ok) && !io.in.irq
-  io.in.fetch(1).ready := (fetch1_ok && pipe0.io.in.issue.fire || pipe1.io.in.issue.fire) && !io.in.irq
+  io.in.fetch(0).ready := (fetch0_ok && pipe0.io.in.issue.fire) && !io.in.irq
+  io.in.fetch(1).ready := (fetch1_ok && !fetch0_ok && pipe0.io.in.issue.fire || pipe1.io.in.issue.fire) && !io.in.irq
 
+  pipe0.io.in.issue.fire := slot0_fire && !stall && !div_pending_q
+  pipe1.io.in.issue.fire := slot1_fire && !stall && !div_pending_q
+
+  if (EnableDiff) {
+    val difftest = Module(new Difftest)
+    difftest.io.reset := reset
+    difftest.io.clock := clock
+
+    difftest.io.diff(0).commit := pipe0.io.out.wb.commit
+    difftest.io.diff(0).pc     := pipe0.io.out.wb.pc
+    difftest.io.diff(0).inst   := pipe0.io.out.wb.inst
+    difftest.io.diff(0).skip   := false.B
+
+    difftest.io.diff(1).commit := pipe1.io.out.wb.commit
+    difftest.io.diff(1).pc     := pipe1.io.out.wb.pc
+    difftest.io.diff(1).inst   := pipe1.io.out.wb.inst
+    difftest.io.diff(1).skip   := false.B
+  }
 }
