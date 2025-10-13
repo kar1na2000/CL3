@@ -102,6 +102,17 @@ typedef struct context {
   uint32_t pc;
 } core_context_t;
 
+// Note: The layout of this struct must be kept consistent with the SystemVerilog definition.
+typedef struct _diff_info_t {
+  uint16_t skip;
+  uint16_t commit;
+  uint32_t wdata;
+  uint16_t wen;
+  uint16_t rdIdx;
+  uint32_t inst;
+  uint32_t npc;
+  uint32_t pc;
+} difftest_info_t; 
 
 #ifdef __cplusplus
 extern "C" {

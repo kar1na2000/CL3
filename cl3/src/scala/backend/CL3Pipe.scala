@@ -172,6 +172,7 @@ class CL3Pipe() extends Module {
   io.out.wb.except := wb_q.except
   io.out.wb.inst   := wb_q.info.inst
   io.out.wb.pc     := wb_q.info.pc
+  io.out.wb.npc    := wb_q.npc
   io.out.wb.ra     := wb_q.ra
   io.out.wb.rb     := wb_q.rb
   io.out.wb.result := wb_q.result

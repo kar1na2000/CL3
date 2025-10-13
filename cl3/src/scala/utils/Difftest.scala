@@ -5,16 +5,21 @@ import chisel3.util._
 
 class DiffInfo extends Bundle {
   val pc     = UInt(32.W)
+  val npc    = UInt(32.W)
   val inst   = UInt(32.W)
+  val rdIdx  = UInt(5.W)
+  val wen    = Bool()
+  val wdata  = UInt(32.W)
   val commit = Bool()
   val skip   = Bool()
 }
+
 class Difftest extends BlackBox with HasBlackBoxResource {
   val io = IO(new Bundle {
 
-    val clock     = Input(Clock())
-    val reset     = Input(Reset())
-    val diff      = Input(Vec(2, new DiffInfo()))
+    val clock = Input(Clock())
+    val reset = Input(Reset())
+    val diff_info  = Input(Vec(2, new DiffInfo()))
   })
 
   override def desiredName: String = "difftest_wrapper"
@@ -24,6 +29,4 @@ class Difftest extends BlackBox with HasBlackBoxResource {
   addResource("/vsrc/difftest_wrapper.sv")
   addResource("/vsrc/difftest.sv")
 
-
 }
-

@@ -1,38 +1,43 @@
 
-    module Difftest(
+    module Difftest #(
+      parameter int NR_COMMIT_PORTS = 2
+    )(
       input logic clock,
       input logic reset,
-      difftest_info_t[1:0] diff
+      difftest_info_t[1:0] diff_info
     );
     
-    import "DPI-C" function int difftest_step(input int pc, input int inst, input int c_inst, input int is_c_inst);
-    import "DPI-C" function void difftest_skip(input int pc, input int is_c_inst);
+    import "DPI-C" function int difftest_step(input int n, input difftest_info_t info[]);
 
     int ret;
-    difftest_info_t[1:0] diff_q;
+    logic commit;
+
+    difftest_info_t[NR_COMMIT_PORTS - 1:0] diff_info_q;
 
     always_ff @(posedge clock) begin
       if(reset) begin
-        diff_q[0] <= 0;
-        diff_q[1] <= 0;
+        diff_info_q <= 0;
       end
-      else begin
-        diff_q[0] <= diff[0];
-        diff_q[1] <= diff[1];
+      else 
+        diff_info_q <= diff_info;
+    end
+
+    always_comb begin
+
+      commit = 1'b0;
+      for(int i = 0; i < NR_COMMIT_PORTS; i++) begin
+        commit = commit | diff_info_q[i].commit;
       end
     end
 
     always_ff @(posedge clock) begin
-      for(int i = 0; i < 2; i++) begin
-        if(diff_q[i].commit && !diff_q[i].skip) begin
-          ret = difftest_step(diff_q[i].pc, diff_q[i].inst, 0, 0);
-          if(ret) begin
-            $fatal("HIT BAD TRAP!");
-          end
-        end 
-        else if(diff_q[i].commit && diff_q[i].skip) begin
-          difftest_skip(diff_q[i].pc, 0);
+
+      if(commit) begin
+        ret = difftest_step(NR_COMMIT_PORTS, diff_info_q);
+        if(ret) begin
+          $fatal("HIT BAD TRAP!");
         end
       end
     end
+
   endmodule

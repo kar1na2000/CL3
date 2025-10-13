@@ -21,6 +21,8 @@ class CL3IssueIO extends Bundle {
     val op   = Vec(6, Output(new OpInfo))
     val csr  = new ISCSROutput
     val hold = Output(Bool())
+    val pcmatch0 = Output(Bool())
+    val pcmatch1 = Output(Bool())
   }
 }
 
@@ -54,15 +56,14 @@ class CL3Issue extends Module with CL3Config {
 
   dontTouch(io)
 
-  // TODO: support RVC will change this logic
-  // TODO: optimize PC match logic to support more dual-issue cases
+  val fetch0_pc_match = fetch0.bits.pc(31, 1) === (pc_q(31, 1))
+  val fetch1_pc_match = fetch1.bits.pc(31, 1) === (pc_q(31, 1))
 
-  val fetch0_pc_match = fetch0.bits.pc === (pc_q(31, 2) ## 0.U(2.W))
-  val fetch1_pc_match = fetch1.bits.pc === (pc_q(31, 2) ## 0.U(2.W))
+  io.out.pcmatch0 := fetch0_pc_match
+  io.out.pcmatch1 := fetch1_pc_match
 
-  // The 'fetchx.valid' signal simply indicates that the fetch unit is providing data.
   val fetch0_ok = fetch0.valid && fetch0_pc_match && !(flush || io.in.csr.br.valid)
-  val fetch1_ok = fetch1.valid && fetch1_pc_match && !(flush || io.in.csr.br.valid)
+  val fetch1_ok = fetch1.valid && (fetch1_pc_match || fetch0_pc_match) && !(flush || io.in.csr.br.valid)
 
   val mispred = (fetch0.valid || fetch1.valid) && !(fetch0_ok || fetch1_ok)
 
@@ -254,14 +255,23 @@ class CL3Issue extends Module with CL3Config {
     difftest.io.reset := reset
     difftest.io.clock := clock
 
-    difftest.io.diff(0).commit := pipe0.io.out.wb.commit
-    difftest.io.diff(0).pc     := pipe0.io.out.wb.pc
-    difftest.io.diff(0).inst   := pipe0.io.out.wb.inst
-    difftest.io.diff(0).skip   := false.B
+    //TODO: use a more elegant way to do signal connection
+    difftest.io.diff_info(0).commit := pipe0.io.out.wb.commit
+    difftest.io.diff_info(0).pc     := pipe0.io.out.wb.pc
+    difftest.io.diff_info(0).inst   := pipe0.io.out.wb.inst
+    difftest.io.diff_info(0).skip   := false.B
+    difftest.io.diff_info(0).npc    := pipe0.io.out.wb.npc
+    difftest.io.diff_info(0).rdIdx  := pipe0.io.out.wb.rdIdx
+    difftest.io.diff_info(0).wen    := pipe0.io.out.wb.wen
+    difftest.io.diff_info(0).wdata  := pipe0.io.out.wb.result
 
-    difftest.io.diff(1).commit := pipe1.io.out.wb.commit
-    difftest.io.diff(1).pc     := pipe1.io.out.wb.pc
-    difftest.io.diff(1).inst   := pipe1.io.out.wb.inst
-    difftest.io.diff(1).skip   := false.B
+    difftest.io.diff_info(1).commit := pipe1.io.out.wb.commit
+    difftest.io.diff_info(1).pc     := pipe1.io.out.wb.pc
+    difftest.io.diff_info(1).inst   := pipe1.io.out.wb.inst
+    difftest.io.diff_info(1).skip   := false.B
+    difftest.io.diff_info(1).npc    := pipe1.io.out.wb.npc
+    difftest.io.diff_info(1).rdIdx  := pipe1.io.out.wb.rdIdx
+    difftest.io.diff_info(1).wen    := pipe1.io.out.wb.wen
+    difftest.io.diff_info(1).wdata  := pipe1.io.out.wb.result
   }
 }

@@ -186,6 +186,7 @@ class PipeE2Output extends Bundle {
 class PipeWBOutput extends Bundle {
   val commit = Output(Bool())
   val pc     = Output(UInt(32.W))
+  val npc    = Output(UInt(32.W))
   val inst   = Output(UInt(32.W))
   val except = Output(UInt(6.W))
   val ra     = Output(UInt(32.W))

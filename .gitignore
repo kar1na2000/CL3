@@ -16,6 +16,8 @@
 build/
 !soc/**
 !cl3/**
+!utils/**
+!sw/common/linker.ld
 
 # mill
 out/

@@ -54,19 +54,22 @@ long long mem_read(uint32_t raddr, uint32_t size) {
   if (raddr < RESET_VECTOR || (raddr - RESET_VECTOR >= PMEM_SIZE)) {
     printf("raddr is %x\n", raddr);
     return 0;
-  //  assert(0);
+    //  assert(0);
   }
 
   uint32_t aligned_addr = raddr & 0xfffffffc;
   uint32_t v0 = *(uint32_t *)(mem + aligned_addr - RESET_VECTOR);
-  int64_t  v1 = *(int64_t  *)(mem + aligned_addr - RESET_VECTOR);
+  int64_t v1 = *(int64_t *)(mem + aligned_addr - RESET_VECTOR);
 
   return size == 3 ? v1 : v0;
 }
 
 void mem_write(uint32_t waddr, uint32_t mask, uint32_t wdata) {
   uint8_t *addr = mem + waddr - RESET_VECTOR;
-  // printf("waddr: %#x, mask:%x, data: %#x\n", waddr, mask, wdata);
+  if (waddr < RESET_VECTOR || (waddr - RESET_VECTOR >= PMEM_SIZE)) {
+    printf("waddr: %#x, mask:%x, data: %#x\n", waddr, mask, wdata);
+    return;
+  }
   switch (mask) {
   case 0x1:
     *(volatile uint8_t *)addr = wdata;
@@ -128,84 +131,56 @@ void difftest_init(const Vtop *p, const char *ref_so_file,
   printf("[DIFFTEST] image name: %s, image size : %ld\n", img_file, size);
 }
 
-void update_dut_state(uint32_t pc) {
-  dut.pc = pc;
-  GET_ALL_GPR
-  dut.csr[0] = MEPC;
-  dut.csr[1] = MCAUSE;
-  dut.csr[2] = MTVEC;
-}
+void update_dut_state() { GET_ALL_GPR }
 
-void difftest_info(bool pc_flag, int gpr_mask, int csr_mask) {
-  printf("[DIFFTEST] DUT's PC is %0#8x. \n", dut.pc);
-  if (pc_flag)
-    printf(
-        "[DIFFTEST]" COLOR_RED
-        " DUT's PC is different from REF's PC, REF's PC is %0#8x.\n" COLOR_END,
-        ref.pc);
+// the parameter type is 'svOpenArrayHandle' in Verilator
+int difftest_step(int n, svOpenArrayHandle info) {
 
-  if (gpr_mask) {
-    for (int i = 0; i < GPR_NUM; i++) {
-      if ((gpr_mask >> i) & 1)
-        printf("[DIFFTEST]" COLOR_RED
-               " DUT's GPR[%d] is different from REF's. The value is %0#8x, "
-               "which should be %0#8x. \n" COLOR_END,
-               i, dut.gpr[i], ref.gpr[i]);
+  difftest_info_t *diff_info_ptr = (difftest_info_t *)svGetArrayPtr(info);
+
+  int i;
+  uint32_t npc;
+  for (i = 0; i < n; i++) {
+    if (diff_info_ptr[i].commit) {
+      npc = diff_info_ptr[i].npc;
+      ref_difftest_exec(1);
+      ref_difftest_regcpy((void *)&ref, DIFFTEST_TO_DUT);
+      if (ref.pc != npc) {
+        printf(COLOR_RED "[DIFFTEST] Mismatch in PC %0#x: "
+               "DUT's NPC is different from REF's."
+               "Maybe there is an wrong branch/jump/CSR Instruction"
+               "or trap.\n" COLOR_END,
+               diff_info_ptr[i].pc);
+
+        return 1;
+      }
+
+      // GPR Check
+      uint32_t wdata = diff_info_ptr[i].wdata;
+      uint16_t rdIdx = diff_info_ptr[i].rdIdx;
+      if (diff_info_ptr[i].wen && wdata != ref.gpr[rdIdx]) {
+        printf(COLOR_RED "[DIFFTEST] Mismatch in PC %0#x: "
+               "DUT's GPR[%d] is different from REF's. REF's is %0#x "
+               "but DUT's is %0#x.\n" COLOR_END,
+               diff_info_ptr[i].pc, rdIdx, ref.gpr[rdIdx], wdata);
+
+        return 1;
+      }
     }
   }
 
-  // TODO: add CSRs and use map
-  if (csr_mask) {
-    for (int i = 0; i < 3; i++) {
-      if ((csr_mask >> i) & 1)
-        printf("[DIFFTEST]" COLOR_RED
-               " DUT's CSR[%d] is different from REF's. The value is %0#8x, "
-               "which should be %0#8x. \n" COLOR_END,
-               i, dut.csr[i], ref.csr[i]);
-    }
-  }
-}
-
-void difftest_skip(int pc, int is_c_instr) {
-  int offset = 4;
-  if (is_c_instr) {
-    offset = 2;
-  }
-  // The PC of the DUT is the address of the most recently executed instruction,
-  // while the PC of the REF is the address of the next instruction to be
-  // executed.
-  update_dut_state(pc + offset);
-  ref_difftest_regcpy((void *)&dut, DIFFTEST_TO_REF);
-}
-
-int difftest_step(int pc, int instr, int c_instr, int is_c_instr) {
-  update_dut_state(pc);
-
-  // Check PC
-  bool pc_flag = false;
-  ref_difftest_regcpy((void *)&ref, DIFFTEST_TO_DUT);
-  if (ref.pc != dut.pc)
-    pc_flag = true;
-
-  // Check GPRs
+  // Double Check
+  update_dut_state();
   int gpr_mask = 0;
-  ref_difftest_exec(1);
-  ref_difftest_regcpy((void *)&ref, DIFFTEST_TO_DUT);
   for (int i = 0; i < GPR_NUM; i++) {
     if (dut.gpr[i] != ref.gpr[i])
       gpr_mask |= (1U << i);
   }
 
-  int csr_mask = 0;
-  // TODO: add CSRs
-  // for (int i = 0; i < 3; i++) {
-  //   if (dut.csr[i] != ref.csr[i]) {
-  //     csr_mask |= (1U << i);
-  //   }
-  // }
-
-  if (pc_flag || gpr_mask || csr_mask) {
-    difftest_info(pc_flag, gpr_mask, csr_mask);
+  if (gpr_mask) {
+    printf( COLOR_RED "[DIFFTEST] Mismatch in double check: "
+           "Maybe something changed the dut state unexpectedly.\n" COLOR_END);
+    
     return 1;
   }
 
