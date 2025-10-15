@@ -29,6 +29,8 @@ run: all
 	@cat $(RESULT)
 	@rm $(RESULT)
 
+gdb: all
+
 clean:
 	rm -rf Makefile.* build/ common/
 

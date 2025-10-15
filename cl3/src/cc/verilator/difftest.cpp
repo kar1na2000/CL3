@@ -147,9 +147,9 @@ int difftest_step(int n, svOpenArrayHandle info) {
       ref_difftest_regcpy((void *)&ref, DIFFTEST_TO_DUT);
       if (ref.pc != npc) {
         printf(COLOR_RED "[DIFFTEST] Mismatch in PC %0#x: "
-               "DUT's NPC is different from REF's."
-               "Maybe there is an wrong branch/jump/CSR Instruction"
-               "or trap.\n" COLOR_END,
+                         "DUT's NPC is different from REF's. "
+                         "Maybe there is an wrong branch/jump/CSR Instruction"
+                         "or trap.\n" COLOR_END,
                diff_info_ptr[i].pc);
 
         return 1;
@@ -158,10 +158,10 @@ int difftest_step(int n, svOpenArrayHandle info) {
       // GPR Check
       uint32_t wdata = diff_info_ptr[i].wdata;
       uint16_t rdIdx = diff_info_ptr[i].rdIdx;
-      if (diff_info_ptr[i].wen && wdata != ref.gpr[rdIdx]) {
+      if (diff_info_ptr[i].wen && wdata != ref.gpr[rdIdx] && rdIdx != 0) {
         printf(COLOR_RED "[DIFFTEST] Mismatch in PC %0#x: "
-               "DUT's GPR[%d] is different from REF's. REF's is %0#x "
-               "but DUT's is %0#x.\n" COLOR_END,
+                         "DUT's GPR[%d] is different from REF's. REF's is %0#x "
+                         "but DUT's is %0#x.\n" COLOR_END,
                diff_info_ptr[i].pc, rdIdx, ref.gpr[rdIdx], wdata);
 
         return 1;
@@ -170,17 +170,23 @@ int difftest_step(int n, svOpenArrayHandle info) {
   }
 
   // Double Check
+
   update_dut_state();
   int gpr_mask = 0;
   for (int i = 0; i < GPR_NUM; i++) {
-    if (dut.gpr[i] != ref.gpr[i])
+    if (dut.gpr[i] != ref.gpr[i]) {
+      printf(COLOR_RED
+             "[DIFFTEST] GPR[%d]: DUT is %0#x, REF is %0#x\n" COLOR_END,
+             i, dut.gpr[i], ref.gpr[i]);
       gpr_mask |= (1U << i);
+    }
   }
 
   if (gpr_mask) {
-    printf( COLOR_RED "[DIFFTEST] Mismatch in double check: "
-           "Maybe something changed the dut state unexpectedly.\n" COLOR_END);
-    
+    printf(COLOR_RED
+           "[DIFFTEST] Mismatch in double check: "
+           "Maybe something changed the DUT state unexpectedly.\n" COLOR_END);
+
     return 1;
   }
 

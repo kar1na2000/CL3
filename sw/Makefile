@@ -94,3 +94,6 @@ clean:
 
 run: image
 	$(MAKE) -C $(PRJ_HOME) run 
+
+gdb: image
+	$(MAKE) -C $(PRJ_HOME) gdb

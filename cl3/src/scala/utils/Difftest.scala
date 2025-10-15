@@ -17,9 +17,9 @@ class DiffInfo extends Bundle {
 class Difftest extends BlackBox with HasBlackBoxResource {
   val io = IO(new Bundle {
 
-    val clock = Input(Clock())
-    val reset = Input(Reset())
-    val diff_info  = Input(Vec(2, new DiffInfo()))
+    val clock     = Input(Clock())
+    val reset     = Input(Reset())
+    val diff_info = Input(Vec(2, new DiffInfo()))
   })
 
   override def desiredName: String = "difftest_wrapper"

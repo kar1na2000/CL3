@@ -29,7 +29,7 @@ initial begin: reset_gen
     end
     rst_n = 1'b1;
     $display("[TESTBENCH] reset deasserted: %d", $time);
-    $display("[TESTBENCH] note: disable waveform generation and difftest for better performance");
+    $display("[TESTBENCH] note: disable waveform generation and difftest for better simulation performance");
 
 end: reset_gen
 
