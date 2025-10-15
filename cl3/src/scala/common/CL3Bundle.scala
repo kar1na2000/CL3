@@ -55,12 +55,15 @@ class OpInfo extends Bundle {
   val valid = Bool()
   val inst  = UInt(32.W)
   val pc    = UInt(32.W)
+  val wen   = Bool()
   val uop   = new MicroOp
   val ra    = UInt(32.W)
   val rb    = UInt(32.W)
 
   def rdIdx: UInt = inst(11, 7)
+
   def raIdx: UInt = inst(19, 15)
+
   def rbIdx: UInt = inst(24, 20)
 
 }
@@ -68,10 +71,14 @@ class OpInfo extends Bundle {
 object OpInfo {
   def fromDE(de: DEInfo): OpInfo = {
     val op = Wire(new OpInfo)
+    op.inst  := de.inst
+    op.pc    := de.pc
+    op.uop   := de.uop
+    op.wen   := de.wen
+    op.ra    := 0.U     // will be overwrite
+    op.rb    := 0.U     // will be overwrite
+    op.valid := false.B // will be overwrite
 
-    op.inst := de.inst
-    op.pc   := de.pc
-    op.uop  := de.uop
     op
   }
 }
@@ -155,17 +162,51 @@ class PipeEXUInput extends Bundle {
   val br     = Input(new BrInfo)
 }
 
+class PipeInfo extends Bundle {
+  val valid  = Bool()
+  val info   = new DEInfo
+  val pc     = UInt(32.W)
+  val npc    = UInt(32.W)
+  val ra     = UInt(32.W)
+  val rb     = UInt(32.W)
+  val except = UInt(6.W)
+  val result = UInt(32.W)
+
+  def rdIdx: UInt = info.inst(11, 7)
+
+  def isMul: Bool = valid && info.isMUL
+
+  def isLd: Bool = valid && info.isLSU && info.wen
+
+  def isSt: Bool = valid && info.isLSU && !info.wen
+
+  def isBr: Bool = valid && info.isBr && !info.wen
+
+  def isJmp: Bool = valid && info.isBr && info.wen
+
+  def isALU: Bool = valid && info.isEXU && !info.isBr
+
+  def isMem: Bool = isLd || isSt
+
+  def hazard_detect(rsIdx: UInt): Bool = {
+    rsIdx === rdIdx && (isLd || isMul)
+  }
+
+}
+
 class PipeE1Output extends Bundle {
-  val valid = Output(Bool())
-  val isLd  = Output(Bool())
-  val isSt  = Output(Bool())
-  val isMUL = Output(Bool())
-  val isBr  = Output(Bool())
-  val pc    = Output(UInt(32.W))
-  val inst  = Output(UInt(32.W))
-  val ra    = Output(UInt(32.W))
-  val rb    = Output(UInt(32.W))
-  val wen   = Output(Bool())
+  val valid  = Output(Bool())
+  val isLd   = Output(Bool())
+  val isSt   = Output(Bool())
+  val isMUL  = Output(Bool())
+  val isBr   = Output(Bool())
+  val isEXU  = Output(Bool())
+  val pc     = Output(UInt(32.W))
+  val inst   = Output(UInt(32.W))
+  val ra     = Output(UInt(32.W))
+  val rb     = Output(UInt(32.W))
+  val result = Output(UInt(32.W))
+  val wen    = Output(Bool())
 
   def rdIdx: UInt = inst(11, 7)
   def isLSU: Bool = valid && (isLd || isSt)
@@ -173,7 +214,7 @@ class PipeE1Output extends Bundle {
 
 class PipeE2Output extends Bundle {
   val valid  = Output(Bool())
-  val isLoad = Output(Bool())
+  val isLd   = Output(Bool())
   val isMUL  = Output(Bool())
   val pc     = Output(UInt(32.W))
   val inst   = Output(UInt(32.W))
@@ -222,4 +263,11 @@ class ISCSROutput extends Bundle {
   val waddr  = Output(UInt(12.W))
   val wdata  = Output(UInt(32.W))
   val except = Output(UInt(6.W))
+}
+
+class BypassISInfo extends Bundle {
+  val raIdx = UInt(5.W)
+  val rbIdx = UInt(5.W)
+  val ra    = UInt(32.W)
+  val rb    = UInt(32.W)
 }

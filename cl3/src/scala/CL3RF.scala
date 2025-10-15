@@ -24,9 +24,13 @@ class CL3RF extends Module {
 
   val regs = RegInit(VecInit(Seq.fill(32)(0.U(32.W))))
 
+  val conflict = io.wr(1).wen && (io.wr(1).waddr === io.wr(0).waddr)
+
   when(io.wr(1).wen && (io.wr(1).waddr =/= 0.U)) {
     regs(io.wr(1).waddr) := io.wr(1).wdata
-  }.elsewhen(io.wr(0).wen && (io.wr(0).waddr =/= 0.U)) {
+  }
+
+  when(io.wr(0).wen && io.wr(0).waddr =/= 0.U && !conflict) {
     regs(io.wr(0).waddr) := io.wr(0).wdata
   }
 

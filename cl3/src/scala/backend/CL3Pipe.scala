@@ -20,7 +20,7 @@ class PipeInput extends Bundle {
 }
 
 class PipeOutput extends Bundle {
-  val e1    = new PipeE1Output
+  val e1    = Output(new PipeInfo)
   val e2    = new PipeE2Output
   val wb    = new PipeWBOutput
   val stall = Output(Bool())
@@ -36,43 +36,28 @@ class CL3Pipe() extends Module {
 
   val io = IO(new PipeIO)
 
-  class E1Data extends Bundle {
-    val valid  = Bool()
-    val info   = new DEInfo
-    val npc    = UInt(32.W)
-    val ra     = UInt(32.W)
-    val rb     = UInt(32.W)
-    val except = UInt(6.W)
-  }
-
-  val e1_q = RegInit(0.U.asTypeOf(new E1Data))
+  val e1_q = RegInit(0.U.asTypeOf(new PipeInfo))
 
   val e1_flush = io.in.flush || io.out.flush
+  val e1_stall = io.in.stall
 
-  when(io.in.issue.fire && !io.in.stall && !e1_flush) {
-    e1_q.valid  := true.B
+  when(e1_flush && !e1_stall) {
+    e1_q.valid := false.B
+  }.elsewhen(!e1_stall) {
+    e1_q.valid := io.in.issue.fire
+  }
+
+  when(io.in.issue.fire && !e1_flush && !e1_stall) {
     e1_q.info   := io.in.issue.info
+    // TODO: support RVC
     e1_q.npc    := Mux(io.in.exu.br.valid, io.in.exu.br.pc, io.in.issue.info.pc + 4.U)
     e1_q.ra     := io.in.issue.ra
     e1_q.rb     := io.in.issue.rb
     e1_q.except := io.in.issue.except
-
-  }.elsewhen(e1_flush && !io.in.stall) {
-    e1_q.valid := false.B
-  }.elsewhen(!io.in.stall) {
-    e1_q.valid := io.in.issue.fire
   }
 
-  io.out.e1.valid := e1_q.valid
-  io.out.e1.inst  := e1_q.info.inst
-  io.out.e1.isBr  := e1_q.info.isBr
-  io.out.e1.isLd  := e1_q.info.isLSU && e1_q.info.wen
-  io.out.e1.isSt  := e1_q.info.isLSU && !e1_q.info.wen
-  io.out.e1.isMUL := e1_q.info.isMUL
-  io.out.e1.pc    := e1_q.info.pc
-  io.out.e1.ra    := e1_q.ra
-  io.out.e1.rb    := e1_q.rb
-  io.out.e1.wen   := e1_q.info.wen
+  io.out.e1        := e1_q
+  io.out.e1.result := io.in.exu.result
 
   class E2Data extends Bundle {
     val valid  = Bool()
@@ -111,24 +96,24 @@ class CL3Pipe() extends Module {
     )
   }
 
-  io.out.e2.valid  := e2_q.valid
-  io.out.e2.isLoad := e2_q.info.isLSU && e2_q.info.wen
-  io.out.e2.isMUL  := e2_q.info.isMUL
-  io.out.e2.pc     := e2_q.info.pc
-  io.out.e2.inst   := e2_q.info.inst
+  io.out.e2.valid := e2_q.valid
+  io.out.e2.isLd  := e2_q.info.isLSU && e2_q.info.wen
+  io.out.e2.isMUL := e2_q.info.isMUL
+  io.out.e2.pc    := e2_q.info.pc
+  io.out.e2.inst  := e2_q.info.inst
 
   io.out.e2.wen := !(io.in.stall || io.out.stall) && e2_q.info.wen
 
   io.out.e2.result := MuxCase(
     e2_q.result,
     Seq(
-      io.out.e2.isLoad -> io.in.lsu.rdata,
-      io.out.e2.isMUL  -> io.in.mul.result
+      io.out.e2.isLd  -> io.in.lsu.rdata,
+      io.out.e2.isMUL -> io.in.mul.result
     )
   )
 
   io.out.stall := e1_q.valid && e1_q.info.isDIV && !io.in.div.valid ||
-    e2_q.valid && io.out.e2.isLoad && !io.in.lsu.valid
+    e2_q.valid && io.out.e2.isLd && !io.in.lsu.valid
 
   class WBData extends Bundle {
     val valid  = Bool()
@@ -178,18 +163,4 @@ class CL3Pipe() extends Module {
   io.out.wb.result := wb_q.result
   io.out.wb.wen    := wb_q.wen
 
-  def bypass(idx: UInt, data: UInt): UInt = {
-    val bypassed_data = MuxCase(
-      data,
-      Seq(
-        ((idx =/= 0.U) && io.out.e1.valid && io.out.e1.wen && (idx === io.out.e1.rdIdx))
-          -> io.in.exu.result,
-        ((idx =/= 0.U) && io.out.e2.valid && io.out.e2.wen && (idx === io.out.e2.rdIdx))
-          -> io.out.e2.result,
-        ((idx =/= 0.U) && io.out.wb.commit && io.out.wb.wen && (idx === io.out.wb.rdIdx))
-          -> io.out.wb.result
-      )
-    )
-    bypassed_data
-  }
 }
