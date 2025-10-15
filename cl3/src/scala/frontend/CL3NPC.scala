@@ -150,12 +150,16 @@ class CL3NPC() extends Module with NPCConfig with CL3Config {
     pred_taken     := bp_trigger && io.info.accept
     pred_not_taken := btb_hit && !pred_taken && io.info.accept
 
-    io.info.npc := Mux(pc_is_ret, ras_npc, Mux(btb_hit && (bht_is_taken || btb_entry.isJmp), btb_entry.target, pc_plus_8))
+    io.info.npc := Mux(
+      pc_is_ret,
+      ras_npc,
+      Mux(btb_hit && (bht_is_taken || btb_entry.isJmp), btb_entry.target, pc_plus_8)
+    )
 
     io.info.taken := Mux(bp_trigger, Mux(io.info.pc(2), btb_hit_hi ## 0.U(1.W), btb_hit_hi ## !btb_hit_hi), 0.U(2.W))
 
   } else {
-    io.info.npc    := pc_plus_8
+    io.info.npc   := pc_plus_8
     io.info.taken := false.B
   }
 }

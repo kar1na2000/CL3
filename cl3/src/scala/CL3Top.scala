@@ -65,7 +65,7 @@ class CL3Top extends Module with CL3Config {
     wr_buffer.io.req <> bridge.io.wrReq
     wr_buffer.io.resp <> bridge.io.wrResp
 
-    //TODO: actually we don't need this converter
+    // TODO: actually we don't need this converter
 
     val converter = Module(new AXIWidthConverter)
     converter.io.in <> bridge.io.axi4

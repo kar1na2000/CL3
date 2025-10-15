@@ -42,7 +42,7 @@ class CL3Core extends Module with CL3Config {
   mmu.io.ctrl        := csr.io.out.mmu
 
   val mul = Module(new CL3MUL)
-  mul.io.in.hold         := false.B
+  mul.io.in.hold         := issue.io.out.hold
   mul.io.in.info         := issue.io.out.op(3)
   issue.io.in.mul.result := mul.io.out.result
 
@@ -51,12 +51,12 @@ class CL3Core extends Module with CL3Config {
   issue.io.in.div := div.io.out.wb
 
   val exec0 = Module(new CL3EXU)
-  exec0.io.in.hold    := false.B
+  exec0.io.in.hold    := issue.io.out.hold
   exec0.io.in.info    := issue.io.out.op(0)
   issue.io.in.exec(0) := exec0.io.out.info
 
   val exec1 = Module(new CL3EXU)
-  exec1.io.in.hold    := false.B
+  exec1.io.in.hold    := issue.io.out.hold
   exec1.io.in.info    := issue.io.out.op(1)
   issue.io.in.exec(1) := exec1.io.out.info
 

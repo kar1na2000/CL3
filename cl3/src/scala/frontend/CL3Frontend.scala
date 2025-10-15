@@ -24,8 +24,8 @@ class CL3Frontend extends Module {
 
   val fetch = Module(new CL3Fetch)
   fetch.io.mem <> io.mem
-  fetch.io.bp  <> npc.io.info
-  fetch.io.de  <> decode.io.in
+  fetch.io.bp <> npc.io.info
+  fetch.io.de <> decode.io.in
   fetch.io.br    := io.br
   fetch.io.flush := false.B
 

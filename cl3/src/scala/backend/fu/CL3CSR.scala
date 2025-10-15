@@ -40,8 +40,8 @@ class CL3CSR extends Module with CSRConstant {
 
   val csr_rf = Module(new CL3CSRRF())
 
-  csr_rf.io.raddr := raddr
-  csr_rf.io.ren   := true.B // TODO:
+  csr_rf.io.raddr    := raddr
+  csr_rf.io.ren      := true.B // TODO:
   csr_rf.io.bootAddr := io.in.bootAddr
 
   csr_rf.io.waddr := io.in.wb.waddr

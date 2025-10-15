@@ -89,7 +89,7 @@ class CL3Fetch() extends Module with CL3Config {
       pc_q := io.bp.npc
     }
   } else {
-    when(branch && (stall || !active_q || stall_q)) {
+    when(branch && (stall || !active_q)) {
       pc_q := branch_pc
     }.elsewhen(!stall) {
       pc_q := io.bp.npc
