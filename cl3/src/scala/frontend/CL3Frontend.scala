@@ -19,7 +19,6 @@ class CL3Frontend extends Module {
   npc.io.flush := false.B
 
   val decode = Module(new CL3Decode)
-  io.out <> decode.io.out
   decode.io.br := io.br
 
   val fetch = Module(new CL3Fetch)
@@ -28,5 +27,10 @@ class CL3Frontend extends Module {
   fetch.io.de <> decode.io.in
   fetch.io.br    := io.br
   fetch.io.flush := false.B
+
+  val fifo = Module(new DecodeFIFO)
+  fifo.io.flush := io.br.valid
+  fifo.io.in <> decode.io.out
+  io.out <> fifo.io.out
 
 }

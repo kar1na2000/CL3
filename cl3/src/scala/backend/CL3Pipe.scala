@@ -113,7 +113,7 @@ class CL3Pipe() extends Module {
   )
 
   io.out.stall := e1_q.valid && e1_q.info.isDIV && !io.in.div.valid ||
-    e2_q.valid && io.out.e2.isLd && !io.in.lsu.valid
+    e2_q.valid && e2_q.info.isLSU && !io.in.lsu.valid
 
   class WBData extends Bundle {
     val valid  = Bool()

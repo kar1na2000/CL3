@@ -2,7 +2,7 @@ package cl3
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.dataview._
+
 
 class CL3IssueIO extends Bundle {
   val in = new Bundle {
@@ -193,12 +193,11 @@ class CL3Issue extends Module with CL3Config {
       (slot(1).bits.isDIV || slot(1).bits.isMUL || slot(1).bits.isCSR) &&
       slot(1).valid
 
-  val slot1_type_check = !(
-    slot(1).bits.isEXU && (slot(0).bits.isEXU || slot(0).bits.isLSU || slot(0).bits.isMUL) ||
+  val slot1_type_check =
+    !(slot(1).bits.isEXU && (slot(0).bits.isEXU || slot(0).bits.isLSU || slot(0).bits.isMUL) ||
       slot(1).bits.isBr && (slot(0).bits.isEXU || slot(0).bits.isLSU || slot(0).bits.isMUL) ||
       slot(1).bits.isLSU && (slot(0).bits.isEXU || slot(0).bits.isMUL) ||
-      slot(0).bits.isMUL && (slot(0).bits.isEXU || slot(0).bits.isLSU)
-  )
+      slot(0).bits.isMUL && (slot(0).bits.isEXU || slot(0).bits.isLSU))
 
   val slot1_fire =
     !(slot1_data_check || slot1_struct_check || slot1_type_check || slot1_order_check || io.in.irq) && slot_op(1).valid
@@ -265,7 +264,7 @@ class CL3Issue extends Module with CL3Config {
   io.out.br.pc    := Mux(io.in.csr.br.valid, io.in.csr.br.pc, pc_q)
   io.out.br.priv  := Mux(io.in.csr.br.valid, io.in.csr.br.priv, priv_q)
 
-  io.out.bp       := Mux(pipe1.io.out.e1.isBr, io.in.exec(1).bp, io.in.exec(1).bp)
+  io.out.bp       := Mux(pipe1.io.out.e1.isBr, io.in.exec(1).bp, io.in.exec(0).bp)
   io.out.bp.valid := mispred
 
   io.out.csr.waddr  := pipe0.io.out.wb.csr.waddr

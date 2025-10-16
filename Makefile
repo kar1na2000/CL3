@@ -63,6 +63,7 @@ ifeq ($(VCC), verilator)
 	./cl3/src/cc/verilator/main.cpp \
 	./cl3/src/cc/verilator/difftest.cpp \
 	-CFLAGS -I$(abspath ./cl3/src/cc/verilator/include) \
+	-CFLAGS -g \
 	--timescale 1ns/1ps \
 	--autoflush \
 	--trace --trace-fst \
@@ -106,6 +107,9 @@ endif
 # Test Targets (run, gdb, latest)
 run: $(BIN)
 	$(BIN) $(RUN_ARGS)
+
+gdb: $(BIN)
+	gdb --args $(BIN) $(RUN_ARGS)
 
 wave: 
 	$(WAVE) $(WAVE_DIR)/top.$(WAVE_TYPE)
