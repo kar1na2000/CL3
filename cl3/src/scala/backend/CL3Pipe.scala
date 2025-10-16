@@ -129,6 +129,9 @@ class CL3Pipe() extends Module {
       val wdata = UInt(32.W)
       val wen   = Bool()
     }
+    val mem    = new Bundle {
+      val cacheable = Bool()
+    }
 
     def rdIdx: UInt = info.inst(11, 7)
   }
@@ -147,6 +150,7 @@ class CL3Pipe() extends Module {
     wb_q.csr.wen   := e2_q.csr.wen
     wb_q.wen       := io.out.e2.wen
     wb_q.result    := io.out.e2.result
+    wb_q.mem.cacheable := Mux(e2_q.info.isLSU, io.in.lsu.cacheable, true.B)
   }
 
   wb_q.valid := e2_q.valid && !io.in.stall && !io.in.flushWB
@@ -162,5 +166,6 @@ class CL3Pipe() extends Module {
   io.out.wb.rb     := wb_q.rb
   io.out.wb.result := wb_q.result
   io.out.wb.wen    := wb_q.wen
+  io.out.wb.cacheable := wb_q.mem.cacheable
 
 }

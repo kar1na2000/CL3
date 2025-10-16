@@ -138,10 +138,20 @@ int difftest_step(int n, svOpenArrayHandle info) {
 
   difftest_info_t *diff_info_ptr = (difftest_info_t *)svGetArrayPtr(info);
 
+
   int i;
   uint32_t npc;
   for (i = 0; i < n; i++) {
     if (diff_info_ptr[i].commit) {
+
+      if(diff_info_ptr[i].skip) {
+        update_dut_state();
+        dut.pc = diff_info_ptr[i].npc;
+        ref_difftest_regcpy((void *)&dut, DIFFTEST_TO_REF);
+        ref_difftest_regcpy((void *)&ref, DIFFTEST_TO_DUT);
+        continue;
+      }
+
       npc = diff_info_ptr[i].npc;
       ref_difftest_exec(1);
       ref_difftest_regcpy((void *)&ref, DIFFTEST_TO_DUT);

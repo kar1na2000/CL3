@@ -42,6 +42,16 @@ module MemHelper(
 
 	state_t cs, ns;
 
+	logic [63:0] mtime_q;
+	logic [31:0] mtimeh_lock_q;
+
+	always_ff @(posedge clock) begin
+	  if(reset)
+	    mtime_q <= 64'b0;
+	  else
+		mtime_q <= mtime_q + 64'b1;
+	end
+
 	always_ff @(posedge clock) begin
 		if(reset)
 			cs <= IDLE;
@@ -55,6 +65,8 @@ module MemHelper(
 
 	assign sel_uart   = (req_bits_addr == 32'h10000000);
 	assign sel_finish = (req_bits_addr == 32'h1000000C);
+	assign sel_mtimel = (req_bits_addr == 32'h10000010);
+	assign sel_mtimeh = (req_bits_addr == 32'h10000014);
 	assign uart_char  = req_bits_wdata[7:0];
 
 	always_ff @(posedge clock) begin
@@ -63,8 +75,14 @@ module MemHelper(
 		end
 		else begin
 			if(req_valid & req_ready) begin
-  				if(!req_bits_wen)
+  				if(!req_bits_wen && !(sel_mtimel || sel_mtimeh))
   					rdata_q <= mem_read(req_bits_addr, req_bits_size);
+				else if(!req_bits_wen && sel_mtimel) begin
+				    rdata_q <= mtime_q[31:0];
+					mtimeh_lock_q <= mtime_q[63: 32];
+				end
+				else if(!req_bits_wen && sel_mtimeh)
+					rdata_q <= mtimeh_lock_q;
 				else if(req_bits_wen & sel_uart)
             		$write("%s", uart_char);
           		else if(req_bits_wen & sel_finish)

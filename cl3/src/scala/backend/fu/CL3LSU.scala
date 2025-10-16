@@ -79,7 +79,7 @@ class CL3LSU extends Module with LSUConstant {
     req_q.wdata     := io.in.info.rb
     req_q.wen       := is_store
     req_q.mask      := mask
-    req_q.cacheable := false.B // TODO:
+    req_q.cacheable := addr(31) //TODO:
 
     op_q := op
 
@@ -102,12 +102,14 @@ class CL3LSU extends Module with LSUConstant {
   class ReqRecord extends Bundle {
     val mask = UInt(4.W)
     val op   = UInt(4.W)
+    val cacheable = Bool()
   }
 
   val req_record_q = RegInit(0.U.asTypeOf(new ReqRecord))
   when(io.out.mem.fire) {
     req_record_q.mask := req_q.mask
     req_record_q.op   := op_q
+    req_record_q.cacheable := req_q.cacheable
   }
 
   val lb_data = Mux1H(
@@ -135,6 +137,7 @@ class CL3LSU extends Module with LSUConstant {
   io.out.info.valid  := io.in.mem.valid && outstanding_q
   io.out.info.except := 0.U // TODO:
   io.out.info.stall  := pending || io.out.mem.valid && !io.out.mem.ready
+  io.out.info.cacheable := req_record_q.cacheable
 
 }
 

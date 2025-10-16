@@ -139,6 +139,7 @@ class PipeLSUInput extends Bundle {
   val rdata  = Input(UInt(32.W))
   val except = Input(UInt(6.W))
   val stall  = Input(Bool())
+  val cacheable = Input(Bool())
 }
 
 class PipeCSRInput extends Bundle {
@@ -234,6 +235,7 @@ class PipeWBOutput extends Bundle {
   val rb     = Output(UInt(32.W))
   val result = Output(UInt(32.W))
   val wen    = Output(Bool())
+  val cacheable = Output(Bool())
 
   val csr = new Bundle {
     val wen   = Output(Bool())

@@ -286,7 +286,7 @@ class CL3Issue extends Module with CL3Config {
     difftest.io.diff_info(0).commit := pipe0.io.out.wb.commit
     difftest.io.diff_info(0).pc     := pipe0.io.out.wb.pc
     difftest.io.diff_info(0).inst   := pipe0.io.out.wb.inst
-    difftest.io.diff_info(0).skip   := false.B
+    difftest.io.diff_info(0).skip   := !pipe0.io.out.wb.cacheable
     difftest.io.diff_info(0).npc    := pipe0.io.out.wb.npc
     difftest.io.diff_info(0).rdIdx  := pipe0.io.out.wb.rdIdx
     difftest.io.diff_info(0).wen    := pipe0.io.out.wb.wen
@@ -295,7 +295,7 @@ class CL3Issue extends Module with CL3Config {
     difftest.io.diff_info(1).commit := pipe1.io.out.wb.commit
     difftest.io.diff_info(1).pc     := pipe1.io.out.wb.pc
     difftest.io.diff_info(1).inst   := pipe1.io.out.wb.inst
-    difftest.io.diff_info(1).skip   := false.B
+    difftest.io.diff_info(1).skip   := !pipe1.io.out.wb.cacheable
     difftest.io.diff_info(1).npc    := pipe1.io.out.wb.npc
     difftest.io.diff_info(1).rdIdx  := pipe1.io.out.wb.rdIdx
     difftest.io.diff_info(1).wen    := pipe1.io.out.wb.wen
