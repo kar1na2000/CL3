@@ -81,12 +81,12 @@ trait OpConstant {
   val OP0_NONE = "b0000".U(OP0_WIDTH.W)
 
   val OP1_Z   = "b000".U(OP1_WIDTH.W)
-  val OP1_PC  = "b111".U(OP1_WIDTH.W)
   val OP1_REG = "b001".U(OP1_WIDTH.W)
-  val OP1_BEQ = "b010".U(OP1_WIDTH.W)
-  val OP1_BGE = "b011".U(OP1_WIDTH.W)
-  val OP1_BNE = "b100".U(OP1_WIDTH.W)
-  val OP1_BLT = "b101".U(OP1_WIDTH.W)
+  val OP1_PC  = "b010".U(OP1_WIDTH.W)
+  val OP1_BEQ = "b100".U(OP1_WIDTH.W)
+  val OP1_BGE = "b101".U(OP1_WIDTH.W)
+  val OP1_BNE = "b110".U(OP1_WIDTH.W)
+  val OP1_BLT = "b111".U(OP1_WIDTH.W)
 
   val OP2_REG  = "b001".U(OP2_WIDTH.W)
   val OP2_NONE = "b000".U(OP2_WIDTH.W)

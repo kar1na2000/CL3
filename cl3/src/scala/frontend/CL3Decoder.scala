@@ -230,9 +230,10 @@ object BRField extends BoolDecodeField[InstructionPattern] {
 class CL3Decoder extends Module {
 
   val io = IO(new Bundle {
-    val inst = Input(UInt(32.W))
-    val pc   = Input(UInt(32.W))
-    val out  = Output(new DEInfo())
+    val inst  = Input(UInt(32.W))
+    val pc    = Input(UInt(32.W))
+    val dummy = Input(Bool())
+    val out   = Output(new DEInfo())
   })
 
   import CL3InstInfo._
@@ -255,6 +256,7 @@ class CL3Decoder extends Module {
   io.out.inst := io.inst
 
   // TODO: use BoringUtil API
-  io.out.pc := io.pc
+  io.out.pc    := io.pc
+  io.out.dummy := io.dummy
 
 }

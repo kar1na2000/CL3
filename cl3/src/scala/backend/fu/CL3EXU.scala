@@ -11,7 +11,7 @@ class EXUInput extends Bundle {
 }
 
 class EXUOutput extends Bundle {
-  val info = Flipped(new ISEXUInput)
+  val info   = Flipped(new ISEXUInput)
 }
 
 class EXUIO  extends Bundle                 {
@@ -53,7 +53,7 @@ class CL3EXU extends Module with OpConstant {
 
   val alu_res = alu.io.res
 
-  val isBr   = io.in.info.uop.op1.orR && !io.in.info.uop.op1.andR
+  val isBr   = io.in.info.uop.op1(2)
   val isJal  = io.in.info.uop.op2.andR
   val isJalr = !io.in.info.uop.op0.orR
 
@@ -74,12 +74,12 @@ class CL3EXU extends Module with OpConstant {
   io.out.info.br.priv  := 0.U
 
   val is_ret  = isJalr && io.in.info.raIdx === 1.U && !Iimm.andR
-  val is_call = isJal && io.in.info.rdIdx === 1.U &&
+  val is_call = isJal && io.in.info.rdIdx === 1.U ||
     isJalr && io.in.info.rdIdx === 1.U && !is_ret
 
   val bp_q = RegInit(0.U.asTypeOf(new BpInfo))
 
-  bp_q.valid      := io.in.info.valid && isBr
+  bp_q.valid      := io.in.info.valid && (isBr || isJal || isJalr)
   bp_q.isTaken    := taken
   bp_q.isNotTaken := !taken
   bp_q.source     := io.in.info.pc

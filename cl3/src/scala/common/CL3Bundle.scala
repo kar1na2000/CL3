@@ -29,20 +29,25 @@ class NPCIO extends Bundle {
   val pc     = Input(UInt(32.W))
   val accept = Input(Bool())
   val npc    = Output(UInt(32.W))
-  val taken  = Output(Bool())
+  val taken  = Output(UInt(2.W))
 }
 
 class NPCFullIO extends Bundle {
-  val bp    = Input(new BpInfo)
-  val flush = Input(Bool())
-  val info  = new NPCIO
+  val bp      = Input(new BpInfo)
+  val mispred = Input(Bool())
+  val info    = new NPCIO
+}
+
+class FERawInfo extends Bundle {
+  val pc   = UInt(32.W)
+  val inst = UInt(64.W)
+  val pred = UInt(2.W)
 }
 
 class FEInfo extends Bundle {
   val pc    = UInt(32.W)
-  val inst  = UInt(64.W)
-  val pred  = UInt(2.W)
-  val fault = UInt(2.W)
+  val inst  = UInt(32.W)
+  val dummy = Bool()
 }
 
 class MicroOp extends Bundle {
@@ -95,6 +100,7 @@ class DEInfo extends Bundle {
   val isBr    = Bool()
   val uop     = new MicroOp
   val illegal = Bool()
+  val dummy   = Bool()
 
   def rdIdx: UInt = inst(11, 7)
   def raIdx: UInt = inst(19, 15)
@@ -107,19 +113,6 @@ class MMUCtrlInfo extends Bundle {
   val mxr   = Bool()
   val flush = Bool()
   val satp  = UInt(32.W)
-}
-
-class FetchFIFOInput extends Bundle with FetchFIFOConfig {
-  val pc    = Input(UInt(32.W))
-  val data  = Input(UInt(FIFOWidth.W))
-  val info0 = Input(UInt(opInfoWidth.W))
-  val info1 = Input(UInt(opInfoWidth.W))
-}
-
-class FetchFIFOOutput extends Bundle with FetchFIFOConfig {
-  val pc   = Output(UInt(32.W))
-  val inst = Output(UInt((FIFOWidth / 2).W))
-  val info = Output(UInt(opInfoWidth.W))
 }
 
 // ==================== Pipe Bundle =================== //
@@ -135,10 +128,10 @@ class PipeISInput extends Bundle {
 }
 
 class PipeLSUInput extends Bundle {
-  val valid  = Input(Bool())
-  val rdata  = Input(UInt(32.W))
-  val except = Input(UInt(6.W))
-  val stall  = Input(Bool())
+  val valid     = Input(Bool())
+  val rdata     = Input(UInt(32.W))
+  val except    = Input(UInt(6.W))
+  val stall     = Input(Bool())
   val cacheable = Input(Bool())
 }
 
@@ -226,15 +219,15 @@ class PipeE2Output extends Bundle {
 }
 
 class PipeWBOutput extends Bundle {
-  val commit = Output(Bool())
-  val pc     = Output(UInt(32.W))
-  val npc    = Output(UInt(32.W))
-  val inst   = Output(UInt(32.W))
-  val except = Output(UInt(6.W))
-  val ra     = Output(UInt(32.W))
-  val rb     = Output(UInt(32.W))
-  val result = Output(UInt(32.W))
-  val wen    = Output(Bool())
+  val commit    = Output(Bool())
+  val pc        = Output(UInt(32.W))
+  val npc       = Output(UInt(32.W))
+  val inst      = Output(UInt(32.W))
+  val except    = Output(UInt(6.W))
+  val ra        = Output(UInt(32.W))
+  val rb        = Output(UInt(32.W))
+  val result    = Output(UInt(32.W))
+  val wen       = Output(Bool())
   val cacheable = Output(Bool())
 
   val csr = new Bundle {

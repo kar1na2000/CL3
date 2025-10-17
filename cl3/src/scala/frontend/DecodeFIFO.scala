@@ -3,10 +3,9 @@ package cl3
 import chisel3._
 import chisel3.util._
 
-
 trait DecodeFIFOConfig {
-  val FIFOWidth:   Int = 64
-  val FIFODepth:   Int = 2
+  val FIFOWidth: Int = 64
+  val FIFODepth: Int = 2
 }
 
 class DecodeFIFO() extends Module with DecodeFIFOConfig {
@@ -42,7 +41,8 @@ class DecodeFIFO() extends Module with DecodeFIFOConfig {
   val pop0 = io.out(0).fire
   val pop1 = io.out(1).fire
 
-  val pop_complete = !is_empty && ((pop0 && !head.valid1) || (pop1 && !head.valid0) || (pop0 && pop1))
+  // val pop_complete = !is_empty && ((pop0 && !head.valid1) || (pop1 && !head.valid0) || (pop0 && pop1))
+  val pop_complete = !is_empty && (pop1 && head.valid0 && head.valid1) || (pop0 && head.valid0 && !head.valid1) || (pop1 && !head.valid0 && head.valid1)
 
   when(io.flush) {
     wr_ptr_q := 0.U
@@ -53,10 +53,10 @@ class DecodeFIFO() extends Module with DecodeFIFOConfig {
   }.elsewhen(push) {
     entry_vec(wr_ptr_q).info0  := io.in.bits(0)
     entry_vec(wr_ptr_q).info1  := io.in.bits(1)
-    entry_vec(wr_ptr_q).valid0 := true.B
-    entry_vec(wr_ptr_q).valid1 := true.B
+    entry_vec(wr_ptr_q).valid0 := !io.in.bits(0).dummy
+    entry_vec(wr_ptr_q).valid1 := !io.in.bits(1).dummy
 
-    wr_ptr_q                   := wr_ptr_q + 1.U
+    wr_ptr_q := wr_ptr_q + 1.U
   }
 
   when(pop0) {

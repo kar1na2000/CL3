@@ -3,7 +3,6 @@ package cl3
 import chisel3._
 import chisel3.util._
 
-
 class CL3IssueIO extends Bundle {
   val in = new Bundle {
     val fetch = Vec(2, Flipped(Decoupled(Input(new DEInfo))))
@@ -16,11 +15,11 @@ class CL3IssueIO extends Bundle {
   }
 
   val out = new Bundle {
-    val br   = Output(new BrInfo)
-    val bp   = Output(new BpInfo)
-    val op   = Vec(6, Output(new OpInfo))
-    val csr  = new ISCSROutput
-    val hold = Output(Bool())
+    val br          = Output(new BrInfo)
+    val bp          = Output(new BpInfo)
+    val op          = Vec(6, Output(new OpInfo))
+    val csr         = new ISCSROutput
+    val hold        = Output(Bool())
   }
 }
 
@@ -264,8 +263,7 @@ class CL3Issue extends Module with CL3Config {
   io.out.br.pc    := Mux(io.in.csr.br.valid, io.in.csr.br.pc, pc_q)
   io.out.br.priv  := Mux(io.in.csr.br.valid, io.in.csr.br.priv, priv_q)
 
-  io.out.bp       := Mux(pipe1.io.out.e1.isBr, io.in.exec(1).bp, io.in.exec(0).bp)
-  io.out.bp.valid := mispred
+  io.out.bp       := Mux(pipe_e1(1).isBr || pipe_e1(1).isJmp, io.in.exec(1).bp, io.in.exec(0).bp)
 
   io.out.csr.waddr  := pipe0.io.out.wb.csr.waddr
   io.out.csr.wdata  := pipe0.io.out.wb.csr.wdata

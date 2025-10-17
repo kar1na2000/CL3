@@ -6,7 +6,7 @@ import chisel3.util._
 class FEIO extends Bundle {
   val mem   = new CL3ICacheIO
   val br    = Input(new BrInfo)
-  val de    = Decoupled(new FEInfo)
+  val de    = Decoupled(Output(new FERawInfo))
   val bp    = Flipped(new NPCIO)
   val flush = Input(Bool())
 }
@@ -145,10 +145,10 @@ class CL3Fetch() extends Module with CL3Config {
   io.mem.req.bits.flush      := io.flush || flush_q
   io.mem.req.bits.invalidate := false.B
 
-  val skid_buffer_q = RegInit(0.U.asTypeOf(new FEInfo))
+  val skid_buffer_q = RegInit(0.U.asTypeOf(new FERawInfo))
   val skid_valid_q  = RegInit(false.B)
 
-  // TODO: power
+  // TODO:
   when(io.de.valid && !io.de.ready) {
     skid_valid_q  := true.B
     skid_buffer_q := io.de.bits
@@ -157,13 +157,15 @@ class CL3Fetch() extends Module with CL3Config {
   }
 
   val fetch_valid = io.mem.resp.valid && !drop_resp
+  val skid_valid  = skid_valid_q && !drop_resp
   val fetch_pc    = Cat(last_pc_q(31, 3), 0.U(3.W))
 
-  io.de.valid      := fetch_valid || skid_valid_q
-  io.de.bits.pc    := Mux(skid_valid_q, skid_buffer_q.pc, fetch_pc)
-  io.de.bits.inst  := Mux(skid_valid_q, skid_buffer_q.inst, io.mem.resp.bits.rdata)
-  io.de.bits.pred  := Mux(skid_valid_q, skid_buffer_q.pred, last_pred_q)
-  io.de.bits.fault := Mux(skid_valid_q, skid_buffer_q.fault, io.mem.resp.bits.err)
+  io.de.valid     := fetch_valid || skid_valid
+  io.de.bits.pc   := Mux(skid_valid_q, skid_buffer_q.pc, fetch_pc)
+  io.de.bits.inst := Mux(skid_valid_q, skid_buffer_q.inst, io.mem.resp.bits.rdata)
+  io.de.bits.pred := Mux(skid_valid_q, skid_buffer_q.pred, last_pred_q)
+
+  // TODO: add trap support
 
   io.bp.pc     := icache_pc
   io.bp.accept := !stall
