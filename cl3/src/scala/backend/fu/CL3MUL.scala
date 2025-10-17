@@ -28,9 +28,10 @@ class CL3MUL extends Module {
 
   val en = io.in.info.valid && !io.in.hold
 
-  val func3_q = RegEnable(func3, en)
-  val ra_q    = RegEnable(io.in.info.ra, en)
-  val rb_q    = RegEnable(io.in.info.rb, en)
+  val func3_e1_q = RegEnable(func3, en)
+  val ra_q       = RegEnable(io.in.info.ra, en)
+  val rb_q       = RegEnable(io.in.info.rb, en)
+  val func3_e2_q = RegNext(func3_e1_q)
 
   val signext           = SignExt(_: UInt, 33)
   val zeroext           = ZeroExt(_: UInt, 33)
@@ -43,13 +44,13 @@ class CL3MUL extends Module {
 
   val multiplier = Module(new BoothMultiplier(32))
 
-  multiplier.io.ra := LookupTree(func3_q, mulInputFuncTable.map(p => (p._1, p._2._1(ra_q))))
-  multiplier.io.rb := LookupTree(func3_q, mulInputFuncTable.map(p => (p._1, p._2._2(rb_q))))
+  multiplier.io.ra := LookupTree(func3_e1_q, mulInputFuncTable.map(p => (p._1, p._2._1(ra_q))))
+  multiplier.io.rb := LookupTree(func3_e1_q, mulInputFuncTable.map(p => (p._1, p._2._2(rb_q))))
 
   // TODO:
   multiplier.io.valid := true.B
 
-  io.out.result := Mux(func3_q.orR, multiplier.io.res(63, 32), multiplier.io.res(31, 0))
+  io.out.result := Mux(func3_e2_q.orR, multiplier.io.res(63, 32), multiplier.io.res(31, 0))
 }
 
 class C32 extends Module {
