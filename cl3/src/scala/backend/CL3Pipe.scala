@@ -21,8 +21,8 @@ class PipeInput extends Bundle {
 
 class PipeOutput extends Bundle {
   val e1    = Output(new PipeInfo)
-  val e2    = new PipeE2Output
-  val wb    = new PipeWBOutput
+  val e2    = Output(new PipeInfo)
+  val wb    = Output(new PipeInfo)
   val stall = Output(Bool())
   val flush = Output(Bool())
 }
@@ -38,8 +38,8 @@ class CL3Pipe() extends Module {
 
   val e1_q = RegInit(0.U.asTypeOf(new PipeInfo))
 
-  val e1_flush = io.in.flush || io.out.flush
-  val e1_stall = io.in.stall
+  val e1_flush = io.in.flush || io.out.flush //TODO:
+  val e1_stall = io.in.stall //TODO:
 
   when(e1_flush && !e1_stall) {
     e1_q.valid := false.B
@@ -59,113 +59,42 @@ class CL3Pipe() extends Module {
   io.out.e1        := e1_q
   io.out.e1.result := io.in.exu.result
 
-  class E2Data extends Bundle {
-    val valid  = Bool()
-    val info   = new DEInfo
-    val npc    = UInt(32.W)
-    val ra     = UInt(32.W)
-    val rb     = UInt(32.W)
-    val result = UInt(32.W)
-    val except = UInt(6.W)
-    val csr    = new Bundle {
-      val waddr = UInt(12.W)
-      val wdata = UInt(32.W)
-      val wen   = Bool()
-    }
-  }
+  val e2_q = RegInit(0.U.asTypeOf(new PipeInfo)) 
 
-  val e2_q = RegInit(0.U.asTypeOf(new E2Data))
-
-  val e2_flush = io.in.flush || io.out.flush
+  val e2_flush = io.in.flush || io.out.flush //TODO:
+  val e2_stall = io.in.stall //TODO:
 
   when(e2_flush && !io.in.stall) {
     e2_q.valid := false.B
   }.elsewhen(!io.in.stall) {
-    e2_q.valid := e1_q.valid
-    e2_q.info  := e1_q.info
-    e2_q.npc   := e1_q.npc
-    e2_q.ra    := e1_q.ra
-    e2_q.rb    := e2_q.rb
-
-    e2_q.result := MuxCase(
-      io.in.exu.result,
-      Seq(
-        e1_q.info.isDIV -> io.in.div.result,
-        e1_q.info.isCSR -> io.in.csr.rdata
-      )
-    )
+    e2_q       := e1_q
+    e2_q.result := MuxCase(io.in.exu.result, Seq(
+      e1_q.info.isDIV -> io.in.div.result,
+      e1_q.info.isCSR -> io.in.csr.rdata))
   }
-
-  io.out.e2.valid := e2_q.valid
-  io.out.e2.isLd  := e2_q.info.isLSU && e2_q.info.wen
-  io.out.e2.isMUL := e2_q.info.isMUL
-  io.out.e2.pc    := e2_q.info.pc
-  io.out.e2.inst  := e2_q.info.inst
-
-  io.out.e2.wen := !(io.in.stall || io.out.stall) && e2_q.info.wen
-
+  
+  io.out.e2 := e2_q
+  io.out.e2.info.wen := !(io.in.stall || io.out.stall) && e2_q.info.wen
   io.out.e2.result := MuxCase(
     e2_q.result,
     Seq(
       io.out.e2.isLd  -> io.in.lsu.rdata,
-      io.out.e2.isMUL -> io.in.mul.result
+      io.out.e2.isMul -> io.in.mul.result
     )
   )
 
   io.out.stall := e1_q.valid && e1_q.info.isDIV && !io.in.div.valid ||
     e2_q.valid && e2_q.info.isLSU && !io.in.lsu.valid
-
-  class WBData extends Bundle {
-    val valid  = Bool()
-    val info   = new DEInfo
-    val npc    = UInt(32.W)
-    val ra     = UInt(32.W)
-    val rb     = UInt(32.W)
-    val except = UInt(6.W)
-    val result = UInt(32.W)
-    val wen    = Bool()
-    val csr    = new Bundle {
-      val waddr = UInt(12.W)
-      val wdata = UInt(32.W)
-      val wen   = Bool()
-    }
-    val mem    = new Bundle {
-      val cacheable = Bool()
-    }
-
-    def rdIdx: UInt = info.inst(11, 7)
-  }
-
   io.out.flush := false.B // TODO: add exception
 
-  val wb_q = RegInit(0.U.asTypeOf(new WBData))
+  val wb_q   = RegInit(0.U.asTypeOf(new PipeInfo))
 
   when(!io.in.stall) {
-    wb_q.info      := e2_q.info
-    wb_q.npc       := e2_q.npc
-    wb_q.ra        := e2_q.ra
-    wb_q.rb        := e2_q.rb
-    wb_q.except    := 0.U // TODO: add exception
-    wb_q.csr.wdata := e2_q.csr.wdata
-    wb_q.csr.wen   := e2_q.csr.wen
-    wb_q.wen       := io.out.e2.wen
+    wb_q := e2_q
     wb_q.result    := io.out.e2.result
-    wb_q.mem.cacheable := Mux(e2_q.info.isLSU, io.in.lsu.cacheable, true.B)
+    wb_q.mem.cacheable := Mux(e2_q.isMem, io.in.lsu.cacheable, true.B)
   }
 
   wb_q.valid := e2_q.valid && !io.in.stall && !io.in.flushWB
-
-  io.out.wb.commit := wb_q.valid
-
-  io.out.wb.csr    := wb_q.csr
-  io.out.wb.except := wb_q.except
-  io.out.wb.inst   := wb_q.info.inst
-  io.out.wb.pc     := wb_q.info.pc
-  io.out.wb.npc    := wb_q.npc
-  io.out.wb.ra     := wb_q.ra
-  io.out.wb.rb     := wb_q.rb
-  io.out.wb.result := wb_q.result
-  io.out.wb.wen    := wb_q.wen
-  io.out.wb.cacheable := wb_q.mem.cacheable
-
+  io.out.wb := wb_q
 }

@@ -159,12 +159,24 @@ class PipeEXUInput extends Bundle {
 class PipeInfo extends Bundle {
   val valid  = Bool()
   val info   = new DEInfo
-  val pc     = UInt(32.W)
   val npc    = UInt(32.W)
   val ra     = UInt(32.W)
   val rb     = UInt(32.W)
-  val except = UInt(6.W)
   val result = UInt(32.W)
+  val raSrc  = UInt(2.W)
+  val rbSrc  = UInt(2.W)
+  val delay  = UInt(2.W)
+  val except = UInt(6.W)
+
+  val csr    = new Bundle {
+    val waddr = UInt(12.W)
+    val wdata = UInt(32.W)
+    val wen   = Bool()
+  }
+
+  val mem    = new Bundle {
+    val cacheable = Bool()
+  }
 
   def rdIdx: UInt = info.inst(11, 7)
 
@@ -182,62 +194,14 @@ class PipeInfo extends Bundle {
 
   def isMem: Bool = isLd || isSt
 
+  def commit: Bool = valid
+
   def hazard_detect(rsIdx: UInt): Bool = {
     rsIdx === rdIdx && (isLd || isMul)
   }
 
 }
 
-class PipeE1Output extends Bundle {
-  val valid  = Output(Bool())
-  val isLd   = Output(Bool())
-  val isSt   = Output(Bool())
-  val isMUL  = Output(Bool())
-  val isBr   = Output(Bool())
-  val isEXU  = Output(Bool())
-  val pc     = Output(UInt(32.W))
-  val inst   = Output(UInt(32.W))
-  val ra     = Output(UInt(32.W))
-  val rb     = Output(UInt(32.W))
-  val result = Output(UInt(32.W))
-  val wen    = Output(Bool())
-
-  def rdIdx: UInt = inst(11, 7)
-  def isLSU: Bool = valid && (isLd || isSt)
-}
-
-class PipeE2Output extends Bundle {
-  val valid  = Output(Bool())
-  val isLd   = Output(Bool())
-  val isMUL  = Output(Bool())
-  val pc     = Output(UInt(32.W))
-  val inst   = Output(UInt(32.W))
-  val wen    = Output(Bool())
-  val result = Output(UInt(32.W))
-
-  def rdIdx: UInt = inst(11, 7)
-}
-
-class PipeWBOutput extends Bundle {
-  val commit    = Output(Bool())
-  val pc        = Output(UInt(32.W))
-  val npc       = Output(UInt(32.W))
-  val inst      = Output(UInt(32.W))
-  val except    = Output(UInt(6.W))
-  val ra        = Output(UInt(32.W))
-  val rb        = Output(UInt(32.W))
-  val result    = Output(UInt(32.W))
-  val wen       = Output(Bool())
-  val cacheable = Output(Bool())
-
-  val csr = new Bundle {
-    val wen   = Output(Bool())
-    val waddr = Output(UInt(12.W))
-    val wdata = Output(UInt(32.W))
-  }
-
-  def rdIdx: UInt = inst(11, 7)
-}
 
 class ISCSRInput extends Bundle {
   val br     = Input(new BrInfo)

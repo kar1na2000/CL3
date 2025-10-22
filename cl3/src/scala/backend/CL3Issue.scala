@@ -20,6 +20,19 @@ class CL3IssueIO extends Bundle {
     val op          = Vec(6, Output(new OpInfo))
     val csr         = new ISCSROutput
     val hold        = Output(Bool())
+
+
+    val debug = new Bundle {
+    val fetch0_ok   = Output(Bool())
+    val fetch1_ok   = Output(Bool())
+    val slot0_data_check = Output(Bool())
+    val slot1_data_check = Output(Bool())
+    val slot0_struct_check = Output(Bool())
+    val slot1_struct_check = Output(Bool())
+    val slot0_order_check  = Output(Bool())
+    val slot1_order_check  = Output(Bool())
+    val slot1_type_check   = Output(Bool())
+    }
   }
 }
 
@@ -159,10 +172,10 @@ class CL3Issue extends Module with CL3Config {
   /* stall the instruction issue if it has a data dependency
   on a multi-cycle instruction currently in the E1 stage. */
   val slot0_data_check =
-    pipe_e1(0).hazard_detect(slot_op(0).raIdx) ||
+      pipe_e1(0).hazard_detect(slot_op(0).raIdx) ||
       pipe_e1(0).hazard_detect(slot_op(0).rbIdx) ||
       pipe_e1(1).hazard_detect(slot_op(0).raIdx) ||
-      pipe_e1(1).hazard_detect(slot_op(0).rbIdx)
+      pipe_e1(1).hazard_detect(slot_op(0).rbIdx) && slot(0).valid
 
   val slot0_struct_check =
     io.in.lsu.stall || div_pending || stall
@@ -177,12 +190,12 @@ class CL3Issue extends Module with CL3Config {
   /*---------------- slot 1 issue check ---------------- */
 
   val slot1_data_check =
-    pipe_e1(0).hazard_detect(slot_op(1).raIdx) ||
+      (pipe_e1(0).hazard_detect(slot_op(1).raIdx) ||
       pipe_e1(0).hazard_detect(slot_op(1).rbIdx) ||
       pipe_e1(1).hazard_detect(slot_op(1).raIdx) ||
       pipe_e1(1).hazard_detect(slot_op(1).rbIdx) ||
       slot_op(1).raIdx === slot_op(0).rdIdx && slot_op(0).wen ||
-      slot_op(1).rbIdx === slot_op(0).rdIdx && slot_op(0).wen
+      slot_op(1).rbIdx === slot_op(0).rdIdx && slot_op(0).wen) && slot(1).valid
 
   val slot1_struct_check =
     io.in.lsu.stall || div_pending || stall || !slot0_fire
@@ -194,9 +207,9 @@ class CL3Issue extends Module with CL3Config {
 
   val slot1_type_check =
     !(slot(1).bits.isEXU && (slot(0).bits.isEXU || slot(0).bits.isLSU || slot(0).bits.isMUL) ||
-      slot(1).bits.isBr && (slot(0).bits.isEXU || slot(0).bits.isLSU || slot(0).bits.isMUL) ||
+      slot(1).bits.isBr  && (slot(0).bits.isEXU || slot(0).bits.isLSU || slot(0).bits.isMUL) ||
       slot(1).bits.isLSU && (slot(0).bits.isEXU || slot(0).bits.isMUL) ||
-      slot(0).bits.isMUL && (slot(0).bits.isEXU || slot(0).bits.isLSU))
+      slot(1).bits.isMUL && (slot(0).bits.isEXU || slot(0).bits.isLSU) || !slot(0).valid) && slot(1).valid
 
   val slot1_fire =
     !(slot1_data_check || slot1_struct_check || slot1_type_check || slot1_order_check || io.in.irq) && slot_op(1).valid
@@ -205,11 +218,11 @@ class CL3Issue extends Module with CL3Config {
   pipe1.io.in.issue.fire := slot1_fire
 
 // TODO: CSR
-  rf.io.wr(0).wen   := pipe0.io.out.wb.wen && pipe0.io.out.wb.commit
+  rf.io.wr(0).wen   := pipe0.io.out.wb.info.wen && pipe0.io.out.wb.commit
   rf.io.wr(0).waddr := pipe0.io.out.wb.rdIdx
   rf.io.wr(0).wdata := pipe0.io.out.wb.result
 
-  rf.io.wr(1).wen   := pipe1.io.out.wb.wen && pipe1.io.out.wb.commit
+  rf.io.wr(1).wen   := pipe1.io.out.wb.info.wen && pipe1.io.out.wb.commit
   rf.io.wr(1).waddr := pipe1.io.out.wb.rdIdx
   rf.io.wr(1).wdata := pipe1.io.out.wb.result
 
@@ -282,22 +295,34 @@ class CL3Issue extends Module with CL3Config {
 
     // TODO: use a more elegant way to do signal connection
     difftest.io.diff_info(0).commit := pipe0.io.out.wb.commit
-    difftest.io.diff_info(0).pc     := pipe0.io.out.wb.pc
-    difftest.io.diff_info(0).inst   := pipe0.io.out.wb.inst
-    difftest.io.diff_info(0).skip   := !pipe0.io.out.wb.cacheable
+    difftest.io.diff_info(0).pc     := pipe0.io.out.wb.info.pc
+    difftest.io.diff_info(0).inst   := pipe0.io.out.wb.info.inst
+    difftest.io.diff_info(0).skip   := !pipe0.io.out.wb.mem.cacheable
     difftest.io.diff_info(0).npc    := pipe0.io.out.wb.npc
     difftest.io.diff_info(0).rdIdx  := pipe0.io.out.wb.rdIdx
-    difftest.io.diff_info(0).wen    := pipe0.io.out.wb.wen
+    difftest.io.diff_info(0).wen    := pipe0.io.out.wb.info.wen
     difftest.io.diff_info(0).wdata  := pipe0.io.out.wb.result
 
     difftest.io.diff_info(1).commit := pipe1.io.out.wb.commit
-    difftest.io.diff_info(1).pc     := pipe1.io.out.wb.pc
-    difftest.io.diff_info(1).inst   := pipe1.io.out.wb.inst
-    difftest.io.diff_info(1).skip   := !pipe1.io.out.wb.cacheable
+    difftest.io.diff_info(1).pc     := pipe1.io.out.wb.info.pc
+    difftest.io.diff_info(1).inst   := pipe1.io.out.wb.info.inst
+    difftest.io.diff_info(1).skip   := !pipe1.io.out.wb.mem.cacheable
     difftest.io.diff_info(1).npc    := pipe1.io.out.wb.npc
     difftest.io.diff_info(1).rdIdx  := pipe1.io.out.wb.rdIdx
-    difftest.io.diff_info(1).wen    := pipe1.io.out.wb.wen
+    difftest.io.diff_info(1).wen    := pipe1.io.out.wb.info.wen
     difftest.io.diff_info(1).wdata  := pipe1.io.out.wb.result
   }
+
+  io.out.debug.fetch0_ok := fetch0_ok
+  io.out.debug.fetch1_ok := fetch1_ok
+  io.out.debug.slot0_data_check := slot0_data_check
+  io.out.debug.slot0_struct_check := slot0_struct_check
+  io.out.debug.slot0_order_check := slot0_order_check
+  io.out.debug.slot1_data_check := slot1_data_check
+  io.out.debug.slot1_order_check := slot1_order_check
+  io.out.debug.slot1_struct_check := slot1_struct_check
+  io.out.debug.slot1_type_check := slot1_type_check
+
+  dontTouch(io.out.debug)
 
 }

@@ -36,10 +36,10 @@ class BypassNetwork extends Module {
   val bypassSources = Seq(
     (pipe1.e1.isALU || pipe1.e1.isJmp, pipe1.e1.rdIdx, pipe1.e1.result),
     (pipe0.e1.isALU || pipe0.e1.isJmp, pipe0.e1.rdIdx, pipe0.e1.result),
-    (pipe1.e2.valid && pipe1.e2.wen, pipe1.e2.rdIdx, pipe1.e2.result),
-    (pipe0.e2.valid && pipe0.e2.wen, pipe0.e2.rdIdx, pipe0.e2.result),
-    (pipe1.wb.commit && pipe1.wb.wen, pipe1.wb.rdIdx, pipe1.wb.result),
-    (pipe0.wb.commit && pipe0.wb.wen, pipe0.wb.rdIdx, pipe0.wb.result)
+    (pipe1.e2.valid && pipe1.e2.info.wen, pipe1.e2.rdIdx, pipe1.e2.result),
+    (pipe0.e2.valid && pipe0.e2.info.wen, pipe0.e2.rdIdx, pipe0.e2.result),
+    (pipe1.wb.commit && pipe1.wb.info.wen, pipe1.wb.rdIdx, pipe1.wb.result),
+    (pipe0.wb.commit && pipe0.wb.info.wen, pipe0.wb.rdIdx, pipe0.wb.result)
   )
 
   io.out.ra0 := BypassNetwork(issue0.raIdx, issue0.ra, bypassSources)
