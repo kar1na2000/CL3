@@ -3,7 +3,8 @@ MILL      := $(or $(shell which mill), ./mill) # Use global mill if available, o
 MKDIR     := mkdir -p
 RM        := rm -rf
 MAKE      ?= make
-VCC       ?= verilator
+# VCC       ?= verilator
+VCC       ?= vcs
 WAVE      ?= gtkwave
 
 # Project Configuration
@@ -25,6 +26,7 @@ verilog:
 	$(MILL) -i $(PRJ).runMain Elaborate --target-dir $(VSRC_DIR)
 	sed -i '/difftest.*\.sv/d' $(VSRC_DIR)/$(CPUTOP).sv
 	sed -i '/mem_helper\.sv/d' $(VSRC_DIR)/$(CPUTOP).sv
+	sed -i '/firrtl_black_box_resource_files.f/, $$d' $(VSRC_DIR)/$(CPUTOP).sv
 	
 # Show Help for Elaborate
 help:
@@ -62,8 +64,7 @@ ifeq ($(VCC), verilator)
 	--Wno-lint --Wno-UNOPTFLAT --Wno-BLKANDNBLK --Wno-COMBDLY --Wno-MODDUP \
 	./cl3/src/cc/verilator/main.cpp \
 	./cl3/src/cc/verilator/difftest.cpp \
-	-CFLAGS -I$(abspath ./cl3/src/cc/verilator/include) \
-	-CFLAGS -g \
+	-CFLAGS -I$(abspath ./cl3/src/cc/verilator/include) -DUSE_VERILATOR \
 	--timescale 1ns/1ps \
 	--autoflush \
 	--trace --trace-fst \
@@ -73,11 +74,19 @@ ifeq ($(VCC), verilator)
 else ifeq ($(VCC), vcs)
 	VF := $(addprefix +incdir+, $(RTLSRC_INCDIR)) \
 	+vc -full64 -sverilog +v2k -timescale=1ns/1ps \
+	+lint=TFIPC-L +notimingcheck \
+	-lca -kdb 	-debug_access \
+	-P ${VERDI_HOME}/share/PLI/VCS/LINUX64/novas.tab \
+     ${VERDI_HOME}/share/PLI/VCS/LINUX64/pli.a \
+	./cl3/src/cc/vcs/difftest.cpp \
+	-CFLAGS "-fPIC -std=gnu++0x \
+	-I$(abspath ./cl3/src/cc/vcs/include) \
+	$(if $(VCS_HOME),-I$(VCS_HOME)/include,)"  \
+	-CXXFLAGS "-fPIC -std=gnu++0x \
+    -I$(abspath ./cl3/src/cc/vcs/include) \
+    $(if $(VCS_HOME),-I$(VCS_HOME)/include,)" \
 	-LDFLAGS -Wl,--no-as-needed \
-	+lint=TFIPC-L \
-	-lca -kdb \
-	-CC "$(if $(VCS_HOME), -I$(VCS_HOME)//include,)" \
-	-debug_access -l $(COMPILE_OUT) \
+	-l $(COMPILE_OUT) \
 	-Mdir=$(BUILD_DIR) \
 	-top $(VTOP) -o $(BUILD_DIR)/$(VTOP)
 else 
@@ -93,12 +102,13 @@ $(BIN): $(RTLSRC_CPU) $(RTLSRC_PERIP) $(RTLSRC_INTERCON) $(RTLSRC_TOP)
 
 bin: $(BIN)
 
-REF ?= ./utils/riscv32-spike-so
-WAVE_TYPE ?= fst
+REF ?= /mnt/mydata/cl3/utils/riscv32-spike-so
+WAVE_TYPE ?= fsdb
 
-RUN_ARGS += --diff
-RUN_ARGS += --ref=$(REF)
-RUN_ARGS += --image=$(IMAGE).bin
+# RUN_ARGS += --diff
+RUN_ARGS += +ref=$(REF)
+RUN_ARGS += +image=$(IMAGE).bin
+RUN_ARGS += +firmware=$(IMAGE).mem
 
 ifneq ($(DUMP_WAVE),)
 RUN_ARGS += +$(WAVE_TYPE)
@@ -107,9 +117,6 @@ endif
 # Test Targets (run, gdb, latest)
 run: $(BIN)
 	$(BIN) $(RUN_ARGS)
-
-gdb: $(BIN)
-	gdb --args $(BIN) $(RUN_ARGS)
 
 wave: 
 	$(WAVE) $(WAVE_DIR)/top.$(WAVE_TYPE)

@@ -1,3 +1,5 @@
+import difftest_pkg::*;
+
 module difftest_wrapper (
   input logic clock,
   input logic reset,
@@ -23,7 +25,7 @@ module difftest_wrapper (
   input logic        diff_info_1_skip
 );
 
-  difftest_info_t[1:0] diff_packed;
+  difftest_pkg::difftest_info_t[0:1] diff_packed;
 
   // --- Assignments for the first set of inputs (index 0) ---
   assign diff_packed[0].pc     = diff_info_0_pc;
