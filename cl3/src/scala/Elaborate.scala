@@ -9,6 +9,7 @@ object Elaborate extends App {
       "disallowPackedArrays",
       "locationInfoStyle=wrapInAtSquareBracket"
     ).reduce(_ + "," + _),
+    "--strip-debug-info",
     "--disable-all-randomization"
     // "-o=vsrc/sv-gen",
     // "--split-verilog"
